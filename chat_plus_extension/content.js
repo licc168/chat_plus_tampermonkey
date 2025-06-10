@@ -1,45 +1,26 @@
-// ==UserScript==
-// @name         DeepSeek & Doubao Chat to word | image
-// @name:zh-CN   DeepSeek & 豆包 对话导出增强
-// @namespace    http://tampermonkey.net/
-// @version      1.7
-// @description  Enhances DeepSeek & Doubao Chat to export conversations as Word documents and generate beautiful knowledge cards. Adds buttons for single messages and global controls to process multiple selected messages.
-// @description:zh-CN 增强 DeepSeek & 豆包 Chat，轻松将对话导出为 Word 文档或生成精美的知识卡片。为每条消息添加独立操作按钮，并通过侧边栏全局控件，批量处理勾选的多条消息。
-// @author       licc168
-// @license      MIT
-// @updateURL    https://raw.githubusercontent.com/licc168/chat_plus_tampermonkey/main/chat_plus.js
-// @downloadURL  https://raw.githubusercontent.com/licc168/chat_plus_tampermonkey/main/chat_plus.js
-// @match        *://chat.deepseek.com/*
-// @match        *://*.doubao.com/*
-// @grant        GM_addStyle
-// @grant        GM_openInTab
-// @grant        GM_setValue
-// @grant        GM_getValue
-// @grant        GM_xmlhttpRequest
-// @grant        GM_log
-// ==/UserScript==
- 
- 
+// content.js
+
 (function() {
     'use strict';
- 
+
     const onDeepSeek = window.location.hostname.includes('deepseek.com');
     const onDoubao = window.location.hostname.includes('doubao.com');
- 
+
     // --- Configuration ---
     const dislikeIconSvgPathStart = "M18.304";
-    const generateButtonText = '生成卡片';
-    const generateButtonTitle = '生成图文卡片 (API)';
+    // Use Chrome's i18n for text
+    const generateButtonText = chrome.i18n.getMessage("generateCardButtonText");
+    const generateButtonTitle = chrome.i18n.getMessage("generateCardButtonTitle");
     const API_ENDPOINT = 'https://api.any2card.com/api/generate-image';
     const API_ENDPOINT_WORD = 'https://api.any2card.com/api/md-to-word';
     const API_ENDPOINT_PDF = 'https://api.any2card.com/api/md-to-pdf';
     const API_ENDPOINT_MINDMAP = 'https://api.any2card.com/api/md-to-mindmap';
-    const API_KEY_STORAGE = 'deepseek_generate_card_api_key';
- 
+    const API_KEY_STORAGE = 'deepseek_generate_card_api_key'; // Still used as the key for storage
+
     let modalOverlay = null;
     let apiKeyInput, markdownTextarea, templateSelect, splitModeSelect, widthInput, heightInput, aspectRatioSelect, fontSelect, watermarkToggle, watermarkTextInput, modalGenerateCardButton, modalCancelButton, cardResultDiv, heightOverflowHiddenToggle, heightOverflowHiddenRow;
     let floatingActionPanel = null;
- 
+
     const floatingButtonStyles = {
         padding: '8px 12px',
         backgroundColor: 'rgb(0, 123, 255)',
@@ -56,8 +37,10 @@
         alignItems: 'center',
         gap: '8px'
     };
- 
+
     // --- Data from constants.ts ---
+    // These arrays can remain as is, or you could move their string values to messages.json if you want to translate template names.
+    // For simplicity, keeping them here as they are configuration data.
     const imageTextTemplates = [
       { id: "memo", name: "备忘录" },
       { id: "popart", name: "波普艺术" },
@@ -78,13 +61,13 @@
       { id: "handwrittennote", name: "手写笔记" },
       { id: "vintagemap", name: "古旧地图" },
     ];
- 
+
     const splitModes = [
         { id: 'long', name: '长图文 (不分割)' },
         { id: 'auto', name: '自动切割 (智能)' },
         { id: 'line', name: '横线拆分 (---)' },
     ];
- 
+
     const aspectRatios = [
         { id: 'custom', name: '自定义尺寸', width: 0, height: 0 },
         { id: '3:4', name: '3:4 竖屏', width: 3, height: 4 },
@@ -93,7 +76,7 @@
         { id: '16:9', name: '16:9 横屏宽', width: 16, height: 9 },
         { id: '9:16', name: '9:16 竖屏长', width: 9, height: 16 },
     ];
- 
+
     const fontOptionsFromConstants = [
       { label: "思源黑体", value: "var(--font-noto-sans-sc)" },
       { label: "思源宋体", value: "var(--font-noto-serif-sc)" },
@@ -111,7 +94,7 @@
       { label: "禅丸哥特体", value: "var(--font-zen-maru-gothic)" },
       { label: "东叔原宋", value: "var(--font-dong-shu-yuan-song)" },
     ];
- 
+
     const fontOptions = fontOptionsFromConstants.map(font => {
         let shortValue = font.value;
         if (font.value.startsWith("var(--font-") && font.value.endsWith(")")) {
@@ -119,203 +102,10 @@
         }
         return { label: font.label, value: shortValue };
     });
- 
- 
-    // --- Add Styles ---
-    GM_addStyle(`
-        .gm-generate-card-button {
-            margin-left: 8px;
-            padding: 5px 10px;
-            font-size: 12px;
-            font-weight: bold;
-            line-height: 1.4;
-            cursor: pointer;
-            border: 1px solid #ffb6c1;
-            background: linear-gradient(145deg, #ffd1dc, #ffb6c1);
-            color: white;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-            border-radius: 16px;
-            vertical-align: middle;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 4px rgba(255, 105, 180, 0.3);
-            transition: all 0.2s ease-in-out;
-        }
-        .gm-generate-card-button:hover {
-            background: linear-gradient(145deg, #ffb6c1, #ffd1dc);
-            border-color: #ff99aa;
-            box-shadow: 0 3px 6px rgba(255, 105, 180, 0.5);
-            transform: translateY(-1px);
-        }
-        .gm-generate-card-button:active {
-            transform: translateY(0px);
-            box-shadow: 0 1px 2px rgba(255, 105, 180, 0.4);
-        }
-        .gm-card-modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
-            z-index: 10000; opacity: 0; visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0s linear 0.3s;
-        }
-        .gm-card-modal-overlay.gm-modal-visible { opacity: 1; visibility: visible; transition: opacity 0.3s ease; }
-        .gm-card-modal-content {
-            background-color: #fff; color: #333; padding: 20px; border-radius: 8px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.3); width: 90%; max-width: 1000px;
-            display: flex; flex-direction: column; gap: 15px;
-            max-height: 90vh;
-        }
-        .gm-card-modal-main-layout {
-            display: flex; gap: 15px; flex-grow: 1; overflow: hidden; min-height: 400px;
-        }
-        .gm-card-modal-column {
-            display: flex; flex-direction: column; gap: 10px; padding: 5px;
-        }
-        .gm-card-modal-column.gm-left-column { flex: 1.2; }
-        .gm-card-modal-column.gm-middle-column {
-            flex: 1; overflow-y: auto; max-height: calc(90vh - 100px); padding-right: 10px;
-        }
-        .gm-card-modal-column.gm-right-column { flex: 1.2; }
- 
-        .gm-card-modal-content label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 13px; }
-        .gm-card-modal-content textarea,
-        .gm-card-modal-content input[type="number"],
-        .gm-card-modal-content input[type="text"],
-        .gm-card-modal-content select {
-            width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;
-            background-color: #fff; color: #333; box-sizing: border-box;
-        }
-        .gm-card-modal-content textarea#gmCardMarkdown {
-            flex-grow: 1; min-height: 200px; resize: vertical; background-color: #f9f9f9;
-        }
-        .gm-card-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
- 
-        .gm-card-modal-watermark-group { display: flex; align-items: center; gap: 10px; }
-        .gm-card-modal-watermark-group input[type="checkbox"] { width: auto; flex-shrink: 0; }
-        .gm-card-modal-watermark-group label { font-weight: normal; margin-bottom: 0; }
- 
-        .gm-card-modal-buttons {
-            display: flex; justify-content: flex-end; gap: 10px; margin-top: auto;
-            padding-top: 10px; border-top: 1px solid #eee;
-        }
-        .gm-card-modal-buttons button {
-            padding: 8px 15px; border-radius: 4px; border: none; cursor: pointer;
-            font-size: 14px; transition: background-color 0.2s ease;
-        }
-        button#gmCardGenerateBtn { background-color: #4CAF50; color: white; }
-        button#gmCardGenerateBtn:hover { background-color: #45a049; }
-        button#gmCardGenerateBtn:disabled { background-color: #aaa; cursor: not-allowed; }
-        button#gmCardCancelBtn { background-color: #f0f0f0; color: #333; border: 1px solid #ccc; }
-        button#gmCardCancelBtn:hover { background-color: #e0e0e0; }
- 
-        #gmCardResultDiv {
-            flex-grow: 1; border: 1px dashed #ccc; min-height: 150px; text-align: left;
-            background-color: #f9f9f9; padding: 10px; overflow-y: auto;
-            position: relative;
-        }
-        #gmCardResultDiv img {
-            max-width: 100%; max-height: 400px; border: 1px solid #eee;
-            border-radius: 4px; background-color: white; display: block;
-        }
-        .gm-preview-image-button {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 5px 10px;
-            background-color: rgba(0, 0, 0, 0.6);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            z-index: 10;
-            font-size: 12px;
-        }
-        .gm-preview-image-button:hover {
-            background-color: rgba(0, 0, 0, 0.8);
-        }
-        #gmCardResultDiv a {
-            display: inline-block; padding: 10px 15px; background-color: #007bff; color: white;
-            text-decoration: none; border-radius: 4px; margin-top: 10px;
-        }
-        #gmCardResultDiv a:hover { background-color: #0056b3; }
-        .gm-spinner {
-            border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff;
-            width: 14px; height: 14px; animation: spin 1s linear infinite;
-            display: inline-block; margin-right: 8px; vertical-align: middle;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
- 
-        .gm-api-key-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            width: 100%;
-        }
-        .gm-api-key-group input[type="text"] {
-            flex-grow: 1;
-            min-width: 0;
-        }
-        .gm-api-key-link {
-            font-size: 12px;
-            color: #007bff;
-            text-decoration: none;
-            white-space: nowrap;
-        }
-        .gm-api-key-link:hover {
-            text-decoration: underline;
-            color: #0056b3;
-        }
- 
-        /* Styles for new features */
-        /* The main button is now cloned, so it doesn't need extensive styling here */
-        #gmMainGenerateCardBtn {
-            cursor: pointer;
-        }
- 
-        /* Using a selector that is hopefully stable enough for message items */
-        .gm-message-item-for-checkbox {
-            position: relative !important;
-            padding-left: 40px !important; /* Increased padding to make space for shifted checkbox */
-        }
- 
-        .gm-message-checkbox-container {
-            position: absolute;
-            top: 10px;
-            left: -25px; /* Moved further to the left */
-            width: 25px;
-            height: 25px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-        }
-        .gm-message-checkbox {
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
-            accent-color: #4CAF50; /* Style the checkbox color */
-        }
- 
-        /* Site-specific adjustments */
-        .gm-on-deepseek .gm-message-item-for-checkbox {
-            position: relative !important;
-            padding-left: 40px !important;
-        }
-        .gm-on-deepseek .gm-message-checkbox-container {
-            left: -25px;
-        }
- 
-        .gm-on-doubao .gm-message-item-for-checkbox {
-            position: relative !important;
-            padding-left: 30px !important;
-        }
-        .gm-on-doubao .gm-message-checkbox-container {
-            left: 5px;
-            top: 15px;
-        }
-    `);
- 
+
+
+    // Removed GM_addStyle - styles are now in styles.css
+
     function createSelect(options, id, defaultSelectedValue) {
         const select = document.createElement('select');
         select.id = id;
@@ -330,14 +120,14 @@
         });
         return select;
     }
- 
+
     function htmlToMarkdown(element) {
         if (!element) return "";
         // Create a temporary clone to work on to avoid modifying the live DOM
         const clone = element.cloneNode(true);
- 
+
         // --- 1. Pre-process and replace special elements ---
- 
+
         // Handle KaTeX math formulas by extracting LaTeX from annotations
         clone.querySelectorAll('.katex, .katex-display').forEach(katexEl => {
             const annotation = katexEl.querySelector('annotation[encoding="application/x-tex"]');
@@ -350,7 +140,7 @@
                 katexEl.replaceWith(document.createTextNode(katexEl.textContent || ''));
             }
         });
- 
+
         // Handle code blocks
         clone.querySelectorAll('pre code').forEach(codeBlock => {
             const parentPre = codeBlock.parentElement;
@@ -358,21 +148,21 @@
             // Replace the <pre> element with a markdown code block as a single text node
             parentPre.replaceWith(document.createTextNode(`\n\n\`\`\`${lang}\n${codeBlock.textContent.trim()}\n\`\`\`\n\n`));
         });
- 
- 
+
+
         // --- 2. Convert remaining HTML to a text-based representation with Markdown-like newlines ---
- 
+
         // This is a simplified process. We'll use innerHTML and a series of regex replacements.
         // It's not as robust as a full DOM traversal, but it's much simpler and handles the main cases.
         let markdown = clone.innerHTML;
- 
+
         // Add newlines for block elements
         markdown = markdown.replace(/<br\s*\/?>/gi, '\n');
         markdown = markdown.replace(/<\/h[1-6]>/gi, '\n\n');
         markdown = markdown.replace(/<\/p>/gi, '\n\n');
         markdown = markdown.replace(/<\/li>/gi, '\n');
         markdown = markdown.replace(/<hr[^>]*>/gi, '\n\n---\n\n');
- 
+
         // Add markdown prefixes for lists and headings
         markdown = markdown.replace(/<h1[^>]*>/gi, '# ');
         markdown = markdown.replace(/<h2[^>]*>/gi, '## ');
@@ -384,7 +174,7 @@
             const level = Math.floor(indentation / 2); // Assuming 2 spaces indentation
             return '  '.repeat(level) + '* ';
         });
- 
+
         // Handle inline elements
         markdown = markdown.replace(/<strong>(.*?)<\/strong>/gis, '**$1**');
         markdown = markdown.replace(/<b>(.*?)<\/b>/gis, '**$1**');
@@ -392,83 +182,83 @@
         markdown = markdown.replace(/<i>(.*?)<\/i>/gis, '*$1*');
         markdown = markdown.replace(/<code[^>]*>(.*?)<\/code>/gis, '`$1`');
         markdown = markdown.replace(/<a href="(.*?)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)');
- 
+
         // --- 3. Strip all remaining tags and clean up whitespace ---
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = markdown;
         markdown = tempDiv.textContent || tempDiv.innerText;
- 
+
         // Normalize newlines, removing excessive blank lines
         return markdown.replace(/(\n\s*){3,}/g, '\n\n').trim();
     }
- 
+
     function createCardModal() {
         if (document.getElementById('gmCardModalOverlay')) return;
- 
+
         modalOverlay = document.createElement('div');
         modalOverlay.id = 'gmCardModalOverlay';
         modalOverlay.className = 'gm-card-modal-overlay';
- 
+
         const modalContent = document.createElement('div');
         modalContent.className = 'gm-card-modal-content';
         modalContent.addEventListener('click', e => e.stopPropagation());
- 
+
         const mainLayout = document.createElement('div');
         mainLayout.className = 'gm-card-modal-main-layout';
- 
+
         const leftColumn = document.createElement('div');
         leftColumn.className = 'gm-card-modal-column gm-left-column';
         let label = document.createElement('label');
         label.htmlFor = 'gmCardMarkdown';
-        label.textContent = '卡片内容 (Markdown):';
+        label.textContent = chrome.i18n.getMessage("cardContentLabel");
         leftColumn.appendChild(label);
         markdownTextarea = document.createElement('textarea');
         markdownTextarea.id = 'gmCardMarkdown';
         markdownTextarea.readOnly = true;
         leftColumn.appendChild(markdownTextarea);
         mainLayout.appendChild(leftColumn);
- 
+
         const middleColumn = document.createElement('div');
         middleColumn.className = 'gm-card-modal-column gm-middle-column';
- 
+
         label = document.createElement('label');
         label.htmlFor = 'gmCardApiKey';
-        label.textContent = 'API Key:';
+        label.textContent = 'API Key:'; // API Key label is usually universal
         middleColumn.appendChild(label);
- 
+
         const apiKeyGroup = document.createElement('div');
         apiKeyGroup.className = 'gm-api-key-group';
- 
+
         apiKeyInput = document.createElement('input');
         apiKeyInput.type = 'text';
         apiKeyInput.id = 'gmCardApiKey';
-        apiKeyInput.placeholder = '请输入您的 API Key';
- 
+        apiKeyInput.placeholder = chrome.i18n.getMessage("apiKeyPlaceholder");
+
         const apiKeyLink = document.createElement('a');
-        apiKeyLink.href = 'https://any2card.com/zh/blog/api-key';
+        apiKeyLink.href = 'https://any2card.com/zh/blog/api-key'; // Link remains fixed
         apiKeyLink.target = '_blank';
         apiKeyLink.rel = 'noopener noreferrer';
-        apiKeyLink.textContent = '获取 API Key';
+        apiKeyLink.textContent = chrome.i18n.getMessage("getApiKeyLink");
         apiKeyLink.className = 'gm-api-key-link';
- 
+
         apiKeyGroup.appendChild(apiKeyInput);
         apiKeyGroup.appendChild(apiKeyLink);
         middleColumn.appendChild(apiKeyGroup);
- 
+
         label = document.createElement('label');
         label.htmlFor = 'gmCardTemplate';
-        label.textContent = '图文模板:';
+        label.textContent = chrome.i18n.getMessage("imageTemplateLabel");
         middleColumn.appendChild(label);
         templateSelect = createSelect(imageTextTemplates, 'gmCardTemplate', imageTextTemplates[0]?.id);
         middleColumn.appendChild(templateSelect);
- 
+
         label = document.createElement('label');
         label.htmlFor = 'gmCardSplitMode';
-        label.textContent = '分割模式:';
+        label.textContent = chrome.i18n.getMessage("splitModeLabel");
         middleColumn.appendChild(label);
         splitModeSelect = createSelect(splitModes, 'gmCardSplitMode', splitModes[0]?.id);
         middleColumn.appendChild(splitModeSelect);
- 
+
         // 新增：超出高度隐藏开关
         heightOverflowHiddenRow = document.createElement('div');
         heightOverflowHiddenRow.style.display = 'flex';
@@ -476,7 +266,7 @@
         heightOverflowHiddenRow.style.margin = '6px 0 0 0';
         let heightOverflowHiddenLabel = document.createElement('label');
         heightOverflowHiddenLabel.htmlFor = 'gmCardHeightOverflowHidden';
-        heightOverflowHiddenLabel.textContent = '超出高度隐藏';
+        heightOverflowHiddenLabel.textContent = chrome.i18n.getMessage("heightOverflowHiddenLabel");
         heightOverflowHiddenLabel.style.marginRight = '8px';
         heightOverflowHiddenToggle = document.createElement('input');
         heightOverflowHiddenToggle.type = 'checkbox';
@@ -485,7 +275,7 @@
         heightOverflowHiddenRow.appendChild(heightOverflowHiddenLabel);
         heightOverflowHiddenRow.appendChild(heightOverflowHiddenToggle);
         middleColumn.appendChild(heightOverflowHiddenRow);
- 
+
         // 监听分割模式变化，只有long时显示
         splitModeSelect.addEventListener('change', function() {
             if (splitModeSelect.value === 'long') {
@@ -498,13 +288,13 @@
         if (splitModeSelect.value === 'long') {
             heightOverflowHiddenRow.style.display = '';
         }
- 
+
         const dimensionGrid = document.createElement('div');
         dimensionGrid.className = 'gm-card-modal-grid';
         let div = document.createElement('div');
         label = document.createElement('label');
         label.htmlFor = 'gmCardWidth';
-        label.textContent = '宽度 (px):';
+        label.textContent = chrome.i18n.getMessage("widthLabel");
         div.appendChild(label);
         widthInput = document.createElement('input');
         widthInput.type = 'number';
@@ -514,7 +304,7 @@
         div = document.createElement('div');
         label = document.createElement('label');
         label.htmlFor = 'gmCardHeight';
-        label.textContent = '高度 (px):';
+        label.textContent = chrome.i18n.getMessage("heightLabel");
         div.appendChild(label);
         heightInput = document.createElement('input');
         heightInput.type = 'number';
@@ -522,10 +312,10 @@
         div.appendChild(heightInput);
         dimensionGrid.appendChild(div);
         middleColumn.appendChild(dimensionGrid);
- 
+
         label = document.createElement('label');
         label.htmlFor = 'gmCardAspectRatio';
-        label.textContent = '宽高比:';
+        label.textContent = chrome.i18n.getMessage("aspectRatioLabel");
         middleColumn.appendChild(label);
         aspectRatioSelect = createSelect(aspectRatios, 'gmCardAspectRatio', aspectRatios.find(r => r.id === '3:4')?.id);
         aspectRatioSelect.addEventListener('change', function() {
@@ -540,14 +330,14 @@
             }
         });
         middleColumn.appendChild(aspectRatioSelect);
- 
+
         label = document.createElement('label');
         label.htmlFor = 'gmCardFont';
-        label.textContent = '字体选择:';
+        label.textContent = chrome.i18n.getMessage("fontSelectionLabel");
         middleColumn.appendChild(label);
         fontSelect = createSelect(fontOptions, 'gmCardFont', fontOptions.find(f => f.value === 'lxgw-wenkai-lite')?.value || fontOptions[0]?.value);
         middleColumn.appendChild(fontSelect);
- 
+
         const watermarkGroup = document.createElement('div');
         watermarkGroup.className = 'gm-card-modal-watermark-group';
         watermarkToggle = document.createElement('input');
@@ -556,59 +346,59 @@
         watermarkGroup.appendChild(watermarkToggle);
         let watermarkLabelElement = document.createElement('label');
         watermarkLabelElement.htmlFor = 'gmCardWatermarkToggle';
-        watermarkLabelElement.textContent = '启用水印';
+        watermarkLabelElement.textContent = chrome.i18n.getMessage("enableWatermarkLabel");
         watermarkGroup.appendChild(watermarkLabelElement);
         watermarkTextInput = document.createElement('input');
         watermarkTextInput.type = 'text';
         watermarkTextInput.id = 'gmCardWatermarkText';
-        watermarkTextInput.placeholder = '水印文字';
+        watermarkTextInput.placeholder = chrome.i18n.getMessage("watermarkTextPlaceholder");
         watermarkTextInput.style.flexGrow = '1';
         watermarkTextInput.disabled = true;
         watermarkToggle.addEventListener('change', () => watermarkTextInput.disabled = !watermarkToggle.checked);
         watermarkGroup.appendChild(watermarkTextInput);
         middleColumn.appendChild(watermarkGroup);
         mainLayout.appendChild(middleColumn);
- 
+
         const rightColumn = document.createElement('div');
         rightColumn.className = 'gm-card-modal-column gm-right-column';
         label = document.createElement('label');
         label.htmlFor = 'gmCardResultDiv';
-        label.textContent = '生成结果:';
+        label.textContent = chrome.i18n.getMessage("generationResultLabel");
         rightColumn.appendChild(label);
         cardResultDiv = document.createElement('div');
         cardResultDiv.id = 'gmCardResultDiv';
         rightColumn.appendChild(cardResultDiv);
         mainLayout.appendChild(rightColumn);
- 
+
         modalContent.appendChild(mainLayout);
- 
+
         const buttonsDiv = document.createElement('div');
         buttonsDiv.className = 'gm-card-modal-buttons';
         modalCancelButton = document.createElement('button');
-        modalCancelButton.textContent = '取消';
+        modalCancelButton.textContent = chrome.i18n.getMessage("cancelButton");
         modalCancelButton.id = 'gmCardCancelBtn';
         modalCancelButton.addEventListener('click', () => modalOverlay.classList.remove('gm-modal-visible'));
         modalGenerateCardButton = document.createElement('button');
-        modalGenerateCardButton.textContent = '生成卡片';
+        modalGenerateCardButton.textContent = chrome.i18n.getMessage("generateCardButtonText");
         modalGenerateCardButton.id = 'gmCardGenerateBtn';
         buttonsDiv.appendChild(modalCancelButton);
         buttonsDiv.appendChild(modalGenerateCardButton);
         modalContent.appendChild(buttonsDiv);
- 
+
         modalOverlay.appendChild(modalContent);
         document.body.appendChild(modalOverlay);
         modalOverlay.addEventListener('click', () => modalOverlay.classList.remove('gm-modal-visible'));
     }
- 
-    function handleGenerateCard() {
+
+    async function handleGenerateCard() {
         const apiKey = apiKeyInput.value.trim();
         if (!apiKey) {
-            alert('请输入 API Key。');
+            alert(chrome.i18n.getMessage("apiKeyRequiredAlert"));
             apiKeyInput.focus();
             return;
         }
-        GM_setValue(API_KEY_STORAGE, apiKey);
- 
+        await chrome.runtime.sendMessage({ action: 'setApiKey', apiKey: apiKey });
+
         const settings = {
             templateType: "imageText",
             selectedImageTextTemplate: templateSelect.value,
@@ -622,130 +412,133 @@
             heightOverflowHidden: splitModeSelect.value === 'long' ? heightOverflowHiddenToggle.checked : false,
         };
         const markdownContent = markdownTextarea.value;
- 
-        if (!markdownContent) { alert('无法获取卡片内容。'); return; }
-        if (settings.cardWidth <= 0 || settings.cardHeight <= 0) { alert('宽度和高度必须是正数。'); return; }
- 
+
+        if (!markdownContent) { alert(chrome.i18n.getMessage("noCardContentAlert")); return; }
+        if (settings.cardWidth <= 0 || settings.cardHeight <= 0) { alert(chrome.i18n.getMessage("invalidDimensionsAlert")); return; }
+
         console.log("API Request Parameters:");
         console.log("Settings:", JSON.parse(JSON.stringify(settings)));
         console.log("Markdown Content:", markdownContent);
- 
+
         modalGenerateCardButton.disabled = true;
-        modalGenerateCardButton.innerHTML = '<span class="gm-spinner"></span>生成中...';
-        cardResultDiv.innerHTML = '正在请求 API...';
- 
-        GM_xmlhttpRequest({
+        modalGenerateCardButton.innerHTML = `<span class="gm-spinner"></span>${chrome.i18n.getMessage("generatingText")}...`;
+        cardResultDiv.innerHTML = chrome.i18n.getMessage("requestingApiText");
+
+        const response = await chrome.runtime.sendMessage({
+            action: 'xmlHttpRequest',
             method: "POST",
             url: API_ENDPOINT,
             headers: {
                 "Content-Type": "application/json",
                 "x-api-key": apiKey
             },
-            data: JSON.stringify({ markdownContent, settings }),
-            onload: function(response) {
-                try {
-                    const result = JSON.parse(response.responseText);
-                    if (response.status >= 200 && response.status < 300 && result.code === 0) {
-                        cardResultDiv.innerHTML = '';
-                        if (result.data && result.data.url) {
-                            if (result.data.type === 'png') {
-                                const img = document.createElement('img');
-                                img.src = result.data.url;
-                                img.alt = '生成的卡片';
-                                cardResultDiv.appendChild(img);
- 
-                                const previewButton = document.createElement('button');
-                                previewButton.textContent = '预览原图';
-                                previewButton.className = 'gm-preview-image-button';
-                                previewButton.onclick = function() {
-                                    GM_openInTab(result.data.url, { active: true, insert: true });
-                                };
-                                cardResultDiv.insertBefore(previewButton, img);
- 
-                            } else if (result.data.type === 'zip') {
-                                const link = document.createElement('a');
-                                link.href = result.data.url;
-                                link.textContent = `下载卡片 (ZIP${result.data.pages ? ' - ' + result.data.pages + '页' : ''})`;
-                                link.target = '_blank';
-                                cardResultDiv.appendChild(link);
-                                if(confirm("ZIP文件已生成，是否立即在新标签页打开下载链接？")) {
-                                    GM_openInTab(result.data.url, { active: true, insert: true });
-                                }
-                            } else {
-                                cardResultDiv.textContent = `收到未知类型的响应: ${result.data.type}`;
+            data: JSON.stringify({ markdownContent, settings })
+        });
+
+        try {
+            if (response.type === 'error') {
+                throw new Error(response.error);
+            }
+
+            if (response.status >= 200 && response.status < 300 && response.type === 'json') {
+                const result = JSON.parse(response.responseText);
+                if (result.code === 0) {
+                    cardResultDiv.innerHTML = '';
+                    if (result.data && result.data.url) {
+                        if (result.data.type === 'png') {
+                            const img = document.createElement('img');
+                            img.src = result.data.url;
+                            img.alt = chrome.i18n.getMessage("generatedCardAlt");
+                            cardResultDiv.appendChild(img);
+
+                            const previewButton = document.createElement('button');
+                            previewButton.textContent = chrome.i18n.getMessage("previewOriginalImageButton");
+                            previewButton.className = 'gm-preview-image-button';
+                            previewButton.onclick = function() {
+                                window.open(result.data.url, '_blank'); // Use window.open for Chrome extension
+                            };
+                            cardResultDiv.insertBefore(previewButton, img);
+
+                        } else if (result.data.type === 'zip') {
+                            const link = document.createElement('a');
+                            link.href = result.data.url;
+                            link.textContent = chrome.i18n.getMessage("downloadCardZipText", [result.data.pages ? ' - ' + result.data.pages + chrome.i18n.getMessage("pagesUnit") : '']);
+                            link.target = '_blank';
+                            cardResultDiv.appendChild(link);
+                            if(confirm(chrome.i18n.getMessage("zipGeneratedConfirm"))) {
+                                window.open(result.data.url, '_blank');
                             }
                         } else {
-                            cardResultDiv.textContent = 'API 响应中未找到有效的图片或文件 URL。';
+                            cardResultDiv.textContent = `${chrome.i18n.getMessage("unknownResponseType")}: ${result.data.type}`;
                         }
                     } else {
-                        throw new Error(result.message || `API 请求失败 (状态 ${response.status})`);
+                        cardResultDiv.textContent = chrome.i18n.getMessage("noValidUrlInApiResponse");
                     }
-                } catch (error) {
-                    console.error('解析响应或处理数据错误:', error);
-                    cardResultDiv.textContent = `错误: ${error.message}`;
-                } finally {
-                    modalGenerateCardButton.disabled = false;
-                    modalGenerateCardButton.textContent = '生成卡片';
+                } else {
+                    throw new Error(result.message || `${chrome.i18n.getMessage("apiFailed")} (API Code: ${result.code})`);
                 }
-            },
-            onerror: function(response) {
-                console.error('GM_xmlhttpRequest 错误:', response);
-                cardResultDiv.textContent = `请求错误: ${response.statusText || '无法连接到服务器'}`;
-                modalGenerateCardButton.disabled = false;
-                modalGenerateCardButton.textContent = '生成卡片';
+            } else if (response.type !== 'error') {
+                 // Fallback for unexpected successful responses that are not JSON
+                 throw new Error(`${chrome.i18n.getMessage("unexpectedApiResponse")} Status: ${response.status}`);
             }
-        });
+        } catch (error) {
+            console.error('Error processing response:', error);
+            cardResultDiv.textContent = `${chrome.i18n.getMessage("errorText")}: ${error.message}`;
+        } finally {
+            modalGenerateCardButton.disabled = false;
+            modalGenerateCardButton.textContent = chrome.i18n.getMessage("generateCardButtonText");
+        }
     }
- 
-    function showCardModal(defaultMarkdown) {
+
+    async function showCardModal(defaultMarkdown) {
         if (!modalOverlay) createCardModal();
- 
+
         markdownTextarea.value = defaultMarkdown;
-        apiKeyInput.value = GM_getValue(API_KEY_STORAGE, "");
- 
+        const result = await chrome.runtime.sendMessage({ action: 'getApiKey' });
+        apiKeyInput.value = result.apiKey || "";
+
         widthInput.value = '440';
         heightInput.value = '587';
         aspectRatioSelect.value = aspectRatios.find(r => r.id === '3:4')?.id || aspectRatios[0].id;
         aspectRatioSelect.dispatchEvent(new Event('change'));
- 
-        // 新增：初始化超出高度隐藏开关
+
         heightOverflowHiddenToggle.checked = false;
         if (splitModeSelect.value === 'long') {
             heightOverflowHiddenRow.style.display = '';
         } else {
             heightOverflowHiddenRow.style.display = 'none';
         }
- 
+
         watermarkToggle.checked = false;
         watermarkTextInput.value = '';
         watermarkTextInput.disabled = true;
         cardResultDiv.innerHTML = '';
- 
+
         const oldBtn = modalGenerateCardButton;
         if (oldBtn && oldBtn.parentNode) {
             modalGenerateCardButton = oldBtn.cloneNode(true);
             oldBtn.parentNode.replaceChild(modalGenerateCardButton, oldBtn);
         }
         modalGenerateCardButton.addEventListener('click', handleGenerateCard);
- 
- 
+
+
         modalOverlay.classList.add('gm-modal-visible');
         if (!apiKeyInput.value) apiKeyInput.focus();
     }
- 
+
     function addGenerateCardButton(targetButtonElement) {
         if (targetButtonElement.dataset.hasGenerateCardButton) return;
- 
+
         const genButton = document.createElement('button');
         genButton.textContent = generateButtonText;
         genButton.title = generateButtonTitle;
         genButton.className = 'gm-generate-card-button';
- 
+
         genButton.addEventListener('click', async function(event) {
             event.stopPropagation();
             event.preventDefault();
             let promptText = '';
- 
+
             // --- Start: New clipboard logic ---
             let copyButton;
             if (onDeepSeek) {
@@ -766,30 +559,30 @@
                     copyButton = actionsContainer.querySelector('button[data-testid="message_action_copy"]');
                 }
             }
- 
+
             if (copyButton) {
                 try {
                     copyButton.click(); // Simulate click on the copy button
                     await new Promise(resolve => setTimeout(resolve, 150)); // 150ms delay
                     promptText = await navigator.clipboard.readText();
- 
+
                     if (promptText && promptText.trim() !== '') {
-                        GM_log('Script: Successfully retrieved content from clipboard.');
+                        console.log('Script: Successfully retrieved content from clipboard.');
                         showCardModal(promptText);
                         return; // Successfully got content from clipboard
                     } else {
-                        GM_log('Script: Clipboard was empty after copy. Falling back to text extraction.');
+                        console.log('Script: Clipboard was empty after copy. Falling back to text extraction.');
                         promptText = ''; // Ensure promptText is reset
                     }
                 } catch (err) {
-                    GM_log('Script: Failed to read from clipboard. Error: ' + err.message + '. Falling back.');
+                    console.log('Script: Failed to read from clipboard. Error: ' + err.message + '. Falling back.');
                     promptText = ''; // Ensure promptText is reset
                 }
             } else {
-                GM_log('Script: Could not find the copy button. Falling back to text extraction.');
+                console.log('Script: Could not find the copy button. Falling back to text extraction.');
             }
             // --- End: New clipboard logic ---
- 
+
             // --- Fallback: Existing text extraction logic ---
             if (!promptText) {
                 if (onDeepSeek) {
@@ -799,7 +592,7 @@
                         '.group', '.chat-message-item', '.message-container',
                         'div[class*="message-bubble"]', 'div[class*="content-container"]',
                     ];
- 
+
                     for (let i = 0; i < 7 && currentElement && currentElement.parentElement; i++) {
                         currentElement = currentElement.parentElement;
                         for (const selector of messageWrapperSelectors) {
@@ -815,7 +608,7 @@
                         }
                         if (messageWrapper) break;
                     }
- 
+
                     if (messageWrapper) {
                         const markdownElements = Array.from(messageWrapper.querySelectorAll('div.ds-markdown.ds-markdown--block:not(:empty)'));
                         let foundMd = null;
@@ -829,7 +622,7 @@
                             promptText = (foundMd.innerText || foundMd.textContent || "").trim();
                         }
                     }
- 
+
                     if (!promptText) {
                         let searchStartNode = targetButtonElement.parentElement;
                         for (let i = 0; i < 3 && searchStartNode; i++) {
@@ -850,7 +643,7 @@
                             searchStartNode = searchStartNode.parentElement;
                         }
                     }
-                    GM_log('Script: Using fallback text extraction for DeepSeek. Found: ' + (promptText ? 'content' : 'no content'));
+                    console.log('Script: Using fallback text extraction for DeepSeek. Found: ' + (promptText ? 'content' : 'no content'));
                 } else if (onDoubao) {
                     const messageWrapper = targetButtonElement.closest('div[data-testid="receive_message"]');
                     if (messageWrapper) {
@@ -862,14 +655,14 @@
                 }
             }
             // --- End of Fallback logic ---
- 
+
             if (!promptText) {
-                GM_log('Script: Could not reliably find message content using any method.');
-                promptText = "# 内容提取失败\\n\\n请手动复制内容或检查脚本的DOM选择器。";
+                console.log('Script: Could not reliably find message content using any method.');
+                promptText = chrome.i18n.getMessage("contentExtractionFailed");
             }
             showCardModal(promptText);
         });
- 
+
         if (targetButtonElement.nextSibling) {
             targetButtonElement.parentNode.insertBefore(genButton, targetButtonElement.nextSibling);
         } else {
@@ -877,7 +670,7 @@
         }
         targetButtonElement.dataset.hasGenerateCardButton = 'true';
     }
- 
+
     function findAndProcessTargetButtons_DeepSeek() {
         const specificDislikeButtonSelector = `div.ds-icon-button svg path[d^="${dislikeIconSvgPathStart}"]`;
         const iconPaths = document.querySelectorAll(specificDislikeButtonSelector);
@@ -892,7 +685,7 @@
             }
         });
     }
- 
+
     function findAndProcessTargetButtons_Doubao() {
         const dislikeButtons = document.querySelectorAll('button[data-testid="message_action_dislike"]');
         dislikeButtons.forEach(button => {
@@ -902,7 +695,7 @@
             }
         });
     }
- 
+
     function findAndProcessTargetButtons() {
         if (onDeepSeek) {
             findAndProcessTargetButtons_DeepSeek();
@@ -910,7 +703,7 @@
             findAndProcessTargetButtons_Doubao();
         }
     }
- 
+
     // --- Helper functions for content extraction ---
     function getCopyButtonFromMessageWrapper(wrapper) {
         if (onDeepSeek) {
@@ -922,13 +715,13 @@
         }
         return null;
     }
- 
+
     function getMarkdownFromMessageWrapper(wrapper) {
         let contentElement;
         if (onDeepSeek) {
             contentElement = wrapper.querySelector('div.ds-markdown.ds-markdown--block:not(:empty)');
             if (contentElement) return htmlToMarkdown(contentElement);
- 
+
             // Fallback for DeepSeek's complex structure
             const children = Array.from(wrapper.children || []);
             for (const child of children) {
@@ -943,40 +736,40 @@
         }
         return '';
     }
- 
+
     async function getCombinedMarkdownForExport() {
         const checkedBoxes = document.querySelectorAll('.gm-message-checkbox:checked');
         if (checkedBoxes.length === 0) {
-            alert('请先勾选需要导出的对话。');
+            alert(chrome.i18n.getMessage("selectConversationsAlert"));
             return null;
         }
- 
+
         let combinedMarkdown = [];
-        let firstTitle = onDeepSeek ? 'DeepSeek' : '豆包';
+        let firstTitle = onDeepSeek ? 'DeepSeek' : 'Doubao';
         let foundFirstTitle = false;
- 
+
         for (const checkbox of checkedBoxes) {
             const messageWrapper = checkbox.closest('.gm-message-item-for-checkbox');
             if (!messageWrapper) continue;
- 
+
             let promptText = '';
             const copyButton = getCopyButtonFromMessageWrapper(messageWrapper);
- 
+
             if (copyButton) {
                 try {
                     copyButton.click();
                     await new Promise(resolve => setTimeout(resolve, 150));
                     promptText = await navigator.clipboard.readText();
-                    GM_log(`Script: Successfully retrieved content from clipboard for ${window.location.hostname}.`);
+                    console.log(`Script: Successfully retrieved content from clipboard for ${window.location.hostname}.`);
                 } catch (err) {
-                    GM_log(`Script: Clipboard copy failed on ${window.location.hostname}: ${err.message}. Falling back to htmlToMarkdown.`);
+                    console.log(`Script: Clipboard copy failed on ${window.location.hostname}: ${err.message}. Falling back to htmlToMarkdown.`);
                     promptText = getMarkdownFromMessageWrapper(messageWrapper);
                 }
             } else {
-                GM_log(`Script: Copy button not found on ${window.location.hostname}, falling back to direct text extraction.`);
+                console.log(`Script: Copy button not found on ${window.location.hostname}, falling back to direct text extraction.`);
                 promptText = getMarkdownFromMessageWrapper(messageWrapper);
             }
- 
+
             if (promptText) {
                 if (!foundFirstTitle) {
                     const titleMatch = promptText.match(/^(?:#\s+)(.+)/);
@@ -988,25 +781,25 @@
                 combinedMarkdown.push(promptText);
             }
         }
- 
+
         if (combinedMarkdown.length === 0) {
-            alert('未能提取已勾选对话的内容。');
+            alert(chrome.i18n.getMessage("failedToExtractContent"));
             return null;
         }
- 
+
         return {
             markdown: combinedMarkdown.join('\n\n---\n\n'),
             title: firstTitle,
         };
     }
- 
+
     // --- New Feature Functions ---
     function createFloatingActionPanel() {
         if (document.getElementById('gm-floating-action-panel')) return;
- 
+
         floatingActionPanel = document.createElement('div');
         floatingActionPanel.id = 'gm-floating-action-panel';
- 
+
         Object.assign(floatingActionPanel.style, {
             position: 'fixed',
             top: '45%',
@@ -1019,14 +812,14 @@
             transition: 'opacity 0.3s ease',
             cursor: 'move'
         });
- 
+
         floatingActionPanel.onmouseenter = () => { floatingActionPanel.style.opacity = '1'; };
         floatingActionPanel.onmouseleave = () => { floatingActionPanel.style.opacity = '0.7'; };
- 
+
         let isDragging = false;
         let initialX, initialY;
         let xOffset = 0, yOffset = 0;
- 
+
         function dragStart(e) {
             if (e.target === floatingActionPanel) {
                 isDragging = true;
@@ -1034,7 +827,7 @@
                 initialY = e.clientY - yOffset;
             }
         }
- 
+
         function drag(e) {
             if (isDragging) {
                 e.preventDefault();
@@ -1045,40 +838,40 @@
                 floatingActionPanel.style.transform = `translate(${xOffset}px, ${yOffset}px)`;
             }
         }
- 
+
         function dragEnd() {
             isDragging = false;
         }
- 
+
         floatingActionPanel.addEventListener('mousedown', dragStart);
         document.addEventListener('mousemove', drag);
         document.addEventListener('mouseup', dragEnd);
- 
+
         document.body.appendChild(floatingActionPanel);
     }
- 
+
     function addExportWordButton() {
         if (document.getElementById('gmMainExportWordBtn') || !floatingActionPanel) return;
- 
+
         const exportWordButton = document.createElement('button');
         exportWordButton.id = 'gmMainExportWordBtn';
         Object.assign(exportWordButton.style, floatingButtonStyles);
- 
- 
+
+
         const iconHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M7 11l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M12 4v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
-        const buttonText = '导出 Word';
+        const buttonText = chrome.i18n.getMessage("exportWordButton");
         exportWordButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
- 
+
         const setLoading = (isLoading) => {
             if (isLoading) {
                 exportWordButton.disabled = true;
-                exportWordButton.innerHTML = '<span class="gm-spinner"></span><span>导出中...</span>';
+                exportWordButton.innerHTML = `<span class="gm-spinner"></span><span>${chrome.i18n.getMessage("exportingText")}...</span>`;
             } else {
                 exportWordButton.disabled = false;
                 exportWordButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
             }
         };
- 
+
         exportWordButton.addEventListener('click', async () => {
             setLoading(true);
             const exportData = await getCombinedMarkdownForExport();
@@ -1086,80 +879,80 @@
                 setLoading(false);
                 return;
             }
- 
-            GM_xmlhttpRequest({
+
+            const payload = { markdown: exportData.markdown, title: exportData.title };
+            console.log('Export to Word params:', payload);
+
+            const response = await chrome.runtime.sendMessage({
+                action: 'xmlHttpRequest',
                 method: "POST",
                 url: API_ENDPOINT_WORD,
                 headers: { "Content-Type": "application/json" },
-                data: JSON.stringify({ markdown: exportData.markdown, title: exportData.title }),
-                responseType: 'blob',
-                onload: function(response) {
-                    setLoading(false);
-                    if (response.status >= 200 && response.status < 300) {
-                        try {
-                            const dispositionHeader = response.responseHeaders.match(/content-disposition:.*/i) ? response.responseHeaders.match(/content-disposition:.*/i)[0] : '';
-                            const filenameMatch = dispositionHeader.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                            const filename = filenameMatch && filenameMatch[1] ? decodeURIComponent(filenameMatch[1].replace(/['"]/g, '')) : 'document.docx';
- 
-                            const blob = response.response;
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.style.display = 'none';
-                            a.href = url;
-                            a.download = filename;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
-                        } catch (e) {
-                            alert('下载文件时出错: ' + e.message);
-                            console.error("处理下载时出错:", e);
-                        }
-                    } else {
-                        const reader = new FileReader();
-                        reader.onload = function() {
-                            try {
-                                const errorResult = JSON.parse(this.result);
-                                alert(`导出失败: ${errorResult.error || '未知错误'}`);
-                            } catch (e) {
-                                alert(`导出失败，状态码: ${response.status}。无法解析错误信息。`);
-                            }
-                        };
-                        reader.readAsText(response.response);
-                    }
-                },
-                onerror: function(response) {
-                    setLoading(false);
-                    alert(`请求错误: ${response.statusText || '无法连接到服务器'}`);
-                }
+                data: JSON.stringify(payload)
             });
+
+            console.log('Raw Export to Word response:', response);
+
+            setLoading(false);
+            if (response.type === 'error') {
+                alert(`${chrome.i18n.getMessage("exportFailed")}: ${response.error}`);
+                return;
+            }
+
+            if (response.status >= 200 && response.status < 300 && response.type === 'blob') {
+                try {
+                    const dispositionHeader = response.responseHeaders;
+                    const filenameMatch = dispositionHeader.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    const filename = filenameMatch && filenameMatch[1] ? decodeURIComponent(filenameMatch[1].replace(/['"]/g, '')) : 'document.docx';
+
+                    let data = response.response;
+                    if (!(data instanceof ArrayBuffer) && !Array.isArray(data) && typeof data === 'object' && data !== null) {
+                        data = Object.values(data);
+                    }
+                    const blob = new Blob([new Uint8Array(data)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    alert(`${chrome.i18n.getMessage("downloadError")}: ` + e.message);
+                    console.error("处理下载时出错:", e);
+                }
+            } else {
+                alert(`${chrome.i18n.getMessage("exportFailed")}: Unexpected response from server.`);
+            }
         });
- 
+
         floatingActionPanel.appendChild(exportWordButton);
     }
- 
+
     function addExportPdfButton() {
         if (document.getElementById('gmMainExportPdfBtn') || !floatingActionPanel) return;
- 
+
         const exportPdfButton = document.createElement('button');
         exportPdfButton.id = 'gmMainExportPdfBtn';
         Object.assign(exportPdfButton.style, floatingButtonStyles);
- 
- 
+
+
         const iconHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 2v7h7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-        const buttonText = '导出 PDF';
+        const buttonText = chrome.i18n.getMessage("exportPdfButton");
         exportPdfButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
- 
+
         const setLoading = (isLoading) => {
             if (isLoading) {
                 exportPdfButton.disabled = true;
-                exportPdfButton.innerHTML = '<span class="gm-spinner"></span><span>导出中...</span>';
+                exportPdfButton.innerHTML = `<span class="gm-spinner"></span><span>${chrome.i18n.getMessage("exportingText")}...</span>`;
             } else {
                 exportPdfButton.disabled = false;
                 exportPdfButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
             }
         };
- 
+
         exportPdfButton.addEventListener('click', async () => {
             setLoading(true);
             const exportData = await getCombinedMarkdownForExport();
@@ -1167,80 +960,80 @@
                 setLoading(false);
                 return;
             }
- 
-            GM_xmlhttpRequest({
+
+            const payload = { markdown: exportData.markdown, title: exportData.title };
+            console.log('Export to PDF params:', payload);
+
+            const response = await chrome.runtime.sendMessage({
+                action: 'xmlHttpRequest',
                 method: "POST",
                 url: API_ENDPOINT_PDF,
                 headers: { "Content-Type": "application/json" },
-                data: JSON.stringify({ markdown: exportData.markdown, title: exportData.title }),
-                responseType: 'blob',
-                onload: function(response) {
-                    setLoading(false);
-                    if (response.status >= 200 && response.status < 300) {
-                        try {
-                            const dispositionHeader = response.responseHeaders.match(/content-disposition:.*/i) ? response.responseHeaders.match(/content-disposition:.*/i)[0] : '';
-                            const filenameMatch = dispositionHeader.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                            const filename = filenameMatch && filenameMatch[1] ? decodeURIComponent(filenameMatch[1].replace(/['"]/g, '')) : 'document.pdf';
- 
-                            const blob = response.response;
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.style.display = 'none';
-                            a.href = url;
-                            a.download = filename;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
-                        } catch (e) {
-                            alert('下载文件时出错: ' + e.message);
-                            console.error("处理下载时出错:", e);
-                        }
-                    } else {
-                        const reader = new FileReader();
-                        reader.onload = function() {
-                            try {
-                                const errorResult = JSON.parse(this.result);
-                                alert(`导出失败: ${errorResult.error || '未知错误'}`);
-                            } catch (e) {
-                                alert(`导出失败，状态码: ${response.status}。无法解析错误信息。`);
-                            }
-                        };
-                        reader.readAsText(response.response);
-                    }
-                },
-                onerror: function(response) {
-                    setLoading(false);
-                    alert(`请求错误: ${response.statusText || '无法连接到服务器'}`);
-                }
+                data: JSON.stringify(payload)
             });
+
+            console.log('Raw Export to PDF response:', response);
+
+            setLoading(false);
+            if (response.type === 'error') {
+                alert(`${chrome.i18n.getMessage("exportFailed")}: ${response.error}`);
+                return;
+            }
+
+            if (response.status >= 200 && response.status < 300 && response.type === 'blob') {
+                try {
+                    const dispositionHeader = response.responseHeaders;
+                    const filenameMatch = dispositionHeader.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    const filename = filenameMatch && filenameMatch[1] ? decodeURIComponent(filenameMatch[1].replace(/['"]/g, '')) : 'document.pdf';
+
+                    let data = response.response;
+                    if (!(data instanceof ArrayBuffer) && !Array.isArray(data) && typeof data === 'object' && data !== null) {
+                        data = Object.values(data);
+                    }
+                    const blob = new Blob([new Uint8Array(data)], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    alert(`${chrome.i18n.getMessage("downloadError")}: ` + e.message);
+                    console.error("处理下载时出错:", e);
+                }
+            } else {
+                alert(`${chrome.i18n.getMessage("exportFailed")}: Unexpected response from server.`);
+            }
         });
- 
+
         floatingActionPanel.appendChild(exportPdfButton);
     }
- 
+
     function addExportMindMapButton() {
         if (document.getElementById('gmMainExportMindMapBtn') || !floatingActionPanel) return;
- 
+
         const exportMindMapButton = document.createElement('button');
         exportMindMapButton.id = 'gmMainExportMindMapBtn';
         Object.assign(exportMindMapButton.style, floatingButtonStyles);
- 
- 
+
+
         const iconHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 12H3M7 12C7 8.68629 9.68629 6 13 6V6C16.3137 6 19 8.68629 19 12V12C19 15.3137 16.3137 18 13 18V18C9.68629 18 7 15.3137 7 12V12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 6V3M13 18V21M19 12H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-        const buttonText = '导出思维导图';
+        const buttonText = chrome.i18n.getMessage("exportMindMapButton");
         exportMindMapButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
- 
+
         const setLoading = (isLoading) => {
             if (isLoading) {
                 exportMindMapButton.disabled = true;
-                exportMindMapButton.innerHTML = '<span class="gm-spinner"></span><span>导出中...</span>';
+                exportMindMapButton.innerHTML = `<span class="gm-spinner"></span><span>${chrome.i18n.getMessage("exportingText")}...</span>`;
             } else {
                 exportMindMapButton.disabled = false;
                 exportMindMapButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
             }
         };
- 
+
         exportMindMapButton.addEventListener('click', async () => {
             setLoading(true);
             const exportData = await getCombinedMarkdownForExport();
@@ -1248,80 +1041,80 @@
                 setLoading(false);
                 return;
             }
- 
-            GM_xmlhttpRequest({
+
+            const payload = { markdown: exportData.markdown, title: exportData.title };
+            console.log('Export to MindMap params:', payload);
+
+            const response = await chrome.runtime.sendMessage({
+                action: 'xmlHttpRequest',
                 method: "POST",
                 url: API_ENDPOINT_MINDMAP,
                 headers: { "Content-Type": "application/json" },
-                data: JSON.stringify({ markdown: exportData.markdown, title: exportData.title }),
-                responseType: 'blob',
-                onload: function(response) {
-                    setLoading(false);
-                    if (response.status >= 200 && response.status < 300) {
-                        try {
-                            const dispositionHeader = response.responseHeaders.match(/content-disposition:.*/i) ? response.responseHeaders.match(/content-disposition:.*/i)[0] : '';
-                            const filenameMatch = dispositionHeader.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                            const filename = filenameMatch && filenameMatch[1] ? decodeURIComponent(filenameMatch[1].replace(/['"]/g, '')) : 'mindmap.mm';
- 
-                            const blob = response.response;
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.style.display = 'none';
-                            a.href = url;
-                            a.download = filename;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
-                        } catch (e) {
-                            alert('下载文件时出错: ' + e.message);
-                            console.error("处理下载时出错:", e);
-                        }
-                    } else {
-                        const reader = new FileReader();
-                        reader.onload = function() {
-                            try {
-                                const errorResult = JSON.parse(this.result);
-                                alert(`导出失败: ${errorResult.error || '未知错误'}`);
-                            } catch (e) {
-                                alert(`导出失败，状态码: ${response.status}。无法解析错误信息。`);
-                            }
-                        };
-                        reader.readAsText(response.response);
-                    }
-                },
-                onerror: function(response) {
-                    setLoading(false);
-                    alert(`请求错误: ${response.statusText || '无法连接到服务器'}`);
-                }
+                data: JSON.stringify(payload)
             });
+
+            console.log('Raw Export to MindMap response:', response);
+
+            setLoading(false);
+            if (response.type === 'error') {
+                alert(`${chrome.i18n.getMessage("exportFailed")}: ${response.error}`);
+                return;
+            }
+
+            if (response.status >= 200 && response.status < 300 && response.type === 'blob') {
+                try {
+                    const dispositionHeader = response.responseHeaders;
+                    const filenameMatch = dispositionHeader.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    const filename = filenameMatch && filenameMatch[1] ? decodeURIComponent(filenameMatch[1].replace(/['"]/g, '')) : 'mindmap.mm';
+
+                    let data = response.response;
+                    if (!(data instanceof ArrayBuffer) && !Array.isArray(data) && typeof data === 'object' && data !== null) {
+                        data = Object.values(data);
+                    }
+                    const blob = new Blob([new Uint8Array(data)], { type: 'application/octet-stream' }); // MIME type for .mm is often octet-stream
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    alert(`${chrome.i18n.getMessage("downloadError")}: ` + e.message);
+                    console.error("处理下载时出错:", e);
+                }
+            } else {
+                alert(`${chrome.i18n.getMessage("exportFailed")}: Unexpected response from server.`);
+            }
         });
- 
+
         floatingActionPanel.appendChild(exportMindMapButton);
     }
- 
+
     function addExportMarkdownButton() {
         if (document.getElementById('gmMainExportMarkdownBtn') || !floatingActionPanel) return;
- 
+
         const exportMarkdownButton = document.createElement('button');
         exportMarkdownButton.id = 'gmMainExportMarkdownBtn';
         Object.assign(exportMarkdownButton.style, floatingButtonStyles);
- 
+
         const iconHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 7V17M15 7V17M9 12H15M3 10V4C3 3.44772 3.44772 3 4 3H16L21 8V20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-        const buttonText = '导出 MD';
+        const buttonText = chrome.i18n.getMessage("exportMarkdownButton");
         exportMarkdownButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
- 
+
         const originalInnerHTML = exportMarkdownButton.innerHTML;
         const setLoading = (isLoading) => {
             if (isLoading) {
                 exportMarkdownButton.disabled = true;
-                exportMarkdownButton.innerHTML = '<span class="gm-spinner"></span><span>导出中...</span>';
+                exportMarkdownButton.innerHTML = `<span class="gm-spinner"></span><span>${chrome.i18n.getMessage("exportingText")}...</span>`;
             } else {
                 exportMarkdownButton.disabled = false;
                 exportMarkdownButton.innerHTML = originalInnerHTML;
             }
         };
- 
+
         exportMarkdownButton.addEventListener('click', async () => {
             setLoading(true);
             const exportData = await getCombinedMarkdownForExport();
@@ -1329,13 +1122,13 @@
                 setLoading(false);
                 return;
             }
- 
+
             try {
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
                 let chatName = document.title.split(' - ')[0] || exportData.title;
-                chatName = `${onDeepSeek ? 'DeepSeek' : '豆包'} - ${chatName}`.replace(/[\/\\?%*:|"<>]/g, '-');
+                chatName = `${onDeepSeek ? 'DeepSeek' : chrome.i18n.getMessage("doubaoAppName")} - ${chatName}`.replace(/[\/\\?%*:|"<>]/g, '-');
                 const fileName = `${chatName}_${timestamp}.md`;
- 
+
                 const blob = new Blob([exportData.markdown], { type: 'text/markdown;charset=utf-8' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -1347,61 +1140,61 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             } catch (e) {
-                alert('下载文件时出错: ' + e.message);
+                alert(`${chrome.i18n.getMessage("downloadError")}: ` + e.message);
                 console.error("处理下载时出错:", e);
             } finally {
                 setLoading(false);
             }
         });
- 
+
         floatingActionPanel.appendChild(exportMarkdownButton);
     }
- 
+
     function addMainGenerateCardButton() {
         if (document.getElementById('gmMainGenerateCardBtn') || !floatingActionPanel) return;
- 
+
         const mainGenButton = document.createElement('button');
         mainGenButton.id = 'gmMainGenerateCardBtn';
         Object.assign(mainGenButton.style, floatingButtonStyles);
- 
+
         const iconHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 15.6538V18C21 19.1046 20.1046 20 19 20H5C3.89543 20 3 19.1046 3 18V6C3 4.89543 3.89543 4 5 4H14.3462" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M7 14L10.0718 10.9282C10.4522 10.5478 11.0854 10.5478 11.4658 10.9282L14 13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><path d="M12.5 15L14.0718 13.4282C14.4522 13.0478 15.0854 13.0478 15.4658 13.4282L18 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><path d="M18 4L22 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M17 9L21 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
-        const buttonText = '生成卡片';
+        const buttonText = chrome.i18n.getMessage("generateCardButtonText");
         mainGenButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
- 
+
         mainGenButton.addEventListener('click', async () => {
             const exportData = await getCombinedMarkdownForExport();
             if (exportData && exportData.markdown) {
                 showCardModal(exportData.markdown);
             } else {
-                alert('未能提取已勾选对话的内容或内容为空。');
+                alert(chrome.i18n.getMessage("failedToExtractOrEmptyContent"));
             }
         });
- 
+
         floatingActionPanel.appendChild(mainGenButton);
     }
- 
+
     function addCheckboxesToMessages_DeepSeek() {
         // 查找所有可能的对话内容区域
         // 提问部分：在ds-flex节点的上级的上级的前面兄弟节点中查找内容
         // 回答部分：在ds-flex节点的上级的前面兄弟节点中查找内容
         const flexElements = document.querySelectorAll('.ds-flex');
- 
+
         flexElements.forEach(flexEl => {
             // 跳过已经处理过的对话区域
             const processedParent = flexEl.closest('.gm-message-item-for-checkbox');
             if (processedParent) {
                 return;
             }
- 
+
             // 检查是否是有效的对话操作区域
             const actionButtons = flexEl.querySelectorAll('.ds-icon-button');
             if (actionButtons.length < 2) {
                 return; // 不是我们要找的操作区域
             }
- 
+
             let messageWrapper = null;
             let contentElement = null;
- 
+
             // 检查是否是回答部分 - 回答部分的flex直接父级是对话容器
             const parentElement = flexEl.parentElement;
             if (parentElement) {
@@ -1411,7 +1204,7 @@
                     contentElement = markdownElement;
                 }
             }
- 
+
             // 检查是否是提问部分 - 提问部分需要往上查找两级，然后查找前面的兄弟节点
             if (!messageWrapper) {
                 const grandParent = flexEl.parentElement?.parentElement;
@@ -1424,48 +1217,48 @@
                     }
                 }
             }
- 
+
             // 如果找到了对话容器和内容元素
             if (messageWrapper && contentElement) {
                 // 确保没有重复添加
                 if (messageWrapper.querySelector('.gm-message-checkbox-container')) {
                     return;
                 }
- 
+
                 // 添加标记类
                 messageWrapper.classList.add('gm-message-item-for-checkbox');
- 
+
                 const container = document.createElement('div');
                 container.className = 'gm-message-checkbox-container';
- 
+
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.className = 'gm-message-checkbox';
- 
+
                 container.appendChild(checkbox);
                 messageWrapper.prepend(container); // 添加到对话容器的开始位置
             }
         });
     }
- 
+
     function addCheckboxesToMessages_Doubao() {
         document.querySelectorAll('div[data-testid="union_message"]').forEach(messageWrapper => {
             if (messageWrapper && !messageWrapper.querySelector('.gm-message-checkbox-container')) {
                 messageWrapper.classList.add('gm-message-item-for-checkbox');
- 
+
                 const container = document.createElement('div');
                 container.className = 'gm-message-checkbox-container';
- 
+
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.className = 'gm-message-checkbox';
- 
+
                 container.appendChild(checkbox);
                 messageWrapper.prepend(container);
             }
         });
     }
- 
+
     function addCheckboxesToMessages() {
         if (onDeepSeek) {
             addCheckboxesToMessages_DeepSeek();
@@ -1473,24 +1266,24 @@
             addCheckboxesToMessages_Doubao();
         }
     }
- 
+
     function addSelectAllButton() {
         if (document.getElementById('gmMainSelectAllBtn') || !floatingActionPanel) return;
- 
+
         const selectAllButton = document.createElement('button');
         selectAllButton.id = 'gmMainSelectAllBtn';
         Object.assign(selectAllButton.style, floatingButtonStyles);
- 
+
         const iconHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 5.5L4.5 7L7.5 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M3 11.5L4.5 13L7.5 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M3 17.5L4.5 19L7.5 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M11 6H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M11 12H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M11 18H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
-        const selectAllText = '全选';
-        const deselectAllText = '取消全选';
- 
+        const selectAllText = chrome.i18n.getMessage("selectAllButton");
+        const deselectAllText = chrome.i18n.getMessage("deselectAllButton");
+
         const textSpan = document.createElement('span');
         textSpan.textContent = selectAllText;
- 
+
         selectAllButton.innerHTML = iconHTML;
         selectAllButton.appendChild(textSpan);
- 
+
         selectAllButton.addEventListener('click', () => {
             const allCheckboxes = document.querySelectorAll('.gm-message-checkbox');
             if (allCheckboxes.length === 0) {
@@ -1500,15 +1293,15 @@
             allCheckboxes.forEach(checkbox => {
                 checkbox.checked = shouldSelectAll;
             });
-            textSpan.textContent = shouldSelectAll ? deselectAllText : '全选';
+            textSpan.textContent = shouldSelectAll ? deselectAllText : selectAllText;
         });
- 
+
         floatingActionPanel.appendChild(selectAllButton);
     }
- 
+
     function runFeatureInjections() {
         findAndProcessTargetButtons(); // Existing feature
- 
+
         // These buttons will be added to the floating panel
         addSelectAllButton();
         addExportWordButton();
@@ -1516,20 +1309,20 @@
         addExportMindMapButton();
         addExportMarkdownButton();
         addMainGenerateCardButton();
- 
+
         addCheckboxesToMessages(); // New feature
     }
- 
+
     // --- Main Execution ---
     createCardModal();
     createFloatingActionPanel();
     document.body.classList.add(onDeepSeek ? 'gm-on-deepseek' : (onDoubao ? 'gm-on-doubao' : ''));
     setTimeout(runFeatureInjections, 3000);
- 
+
     const observer = new MutationObserver((mutationsList) => {
         let needsUpdate = false;
         let needsCheckboxUpdate = false;
- 
+
         for (const mutation of mutationsList) {
             if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
                 mutation.addedNodes.forEach(node => {
@@ -1548,12 +1341,12 @@
                 });
             }
         }
- 
+
         // 如果检测到新的内容元素，立即添加复选框
         if (needsCheckboxUpdate) {
             addCheckboxesToMessages();
         }
- 
+
         // 整体功能更新（可能包括其他功能）
         if (needsUpdate) {
             // Using a timeout to let the DOM settle and avoid over-firing
@@ -1561,5 +1354,5 @@
         }
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
- 
+
 })();

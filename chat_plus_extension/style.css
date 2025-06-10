@@ -1,0 +1,193 @@
+/* styles.css */
+
+.gm-generate-card-button {
+    margin-left: 8px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1.4;
+    cursor: pointer;
+    border: 1px solid #ffb6c1;
+    background: linear-gradient(145deg, #ffd1dc, #ffb6c1);
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    border-radius: 16px;
+    vertical-align: middle;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(255, 105, 180, 0.3);
+    transition: all 0.2s ease-in-out;
+}
+.gm-generate-card-button:hover {
+    background: linear-gradient(145deg, #ffb6c1, #ffd1dc);
+    border-color: #ff99aa;
+    box-shadow: 0 3px 6px rgba(255, 105, 180, 0.5);
+    transform: translateY(-1px);
+}
+.gm-generate-card-button:active {
+    transform: translateY(0px);
+    box-shadow: 0 1px 2px rgba(255, 105, 180, 0.4);
+}
+.gm-card-modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
+    z-index: 10000; opacity: 0; visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+.gm-card-modal-overlay.gm-modal-visible { opacity: 1; visibility: visible; transition: opacity 0.3s ease; }
+.gm-card-modal-content {
+    background-color: #fff; color: #333; padding: 20px; border-radius: 8px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.3); width: 90%; max-width: 1000px;
+    display: flex; flex-direction: column; gap: 15px;
+    max-height: 90vh;
+}
+.gm-card-modal-main-layout {
+    display: flex; gap: 15px; flex-grow: 1; overflow: hidden; min-height: 400px;
+}
+.gm-card-modal-column {
+    display: flex; flex-direction: column; gap: 10px; padding: 5px;
+}
+.gm-card-modal-column.gm-left-column { flex: 1.2; }
+.gm-card-modal-column.gm-middle-column {
+    flex: 1; overflow-y: auto; max-height: calc(90vh - 100px); padding-right: 10px;
+}
+.gm-card-modal-column.gm-right-column { flex: 1.2; }
+
+.gm-card-modal-content label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 13px; }
+.gm-card-modal-content textarea,
+.gm-card-modal-content input[type="number"],
+.gm-card-modal-content input[type="text"],
+.gm-card-modal-content select {
+    width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;
+    background-color: #fff; color: #333; box-sizing: border-box;
+}
+.gm-card-modal-content textarea#gmCardMarkdown {
+    flex-grow: 1; min-height: 200px; resize: vertical; background-color: #f9f9f9;
+}
+.gm-card-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.gm-card-modal-watermark-group { display: flex; align-items: center; gap: 10px; }
+.gm-card-modal-watermark-group input[type="checkbox"] { width: auto; flex-shrink: 0; }
+.gm-card-modal-watermark-group label { font-weight: normal; margin-bottom: 0; }
+
+.gm-card-modal-buttons {
+    display: flex; justify-content: flex-end; gap: 10px; margin-top: auto;
+    padding-top: 10px; border-top: 1px solid #eee;
+}
+.gm-card-modal-buttons button {
+    padding: 8px 15px; border-radius: 4px; border: none; cursor: pointer;
+    font-size: 14px; transition: background-color 0.2s ease;
+}
+button#gmCardGenerateBtn { background-color: #4CAF50; color: white; }
+button#gmCardGenerateBtn:hover { background-color: #45a049; }
+button#gmCardGenerateBtn:disabled { background-color: #aaa; cursor: not-allowed; }
+button#gmCardCancelBtn { background-color: #f0f0f0; color: #333; border: 1px solid #ccc; }
+button#gmCardCancelBtn:hover { background-color: #e0e0e0; }
+
+#gmCardResultDiv {
+    flex-grow: 1; border: 1px dashed #ccc; min-height: 150px; text-align: left;
+    background-color: #f9f9f9; padding: 10px; overflow-y: auto;
+    position: relative;
+}
+#gmCardResultDiv img {
+    max-width: 100%; max-height: 400px; border: 1px solid #eee;
+    border-radius: 4px; background-color: white; display: block;
+}
+.gm-preview-image-button {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 10px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 10;
+    font-size: 12px;
+}
+.gm-preview-image-button:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+}
+#gmCardResultDiv a {
+    display: inline-block; padding: 10px 15px; background-color: #007bff; color: white;
+    text-decoration: none; border-radius: 4px; margin-top: 10px;
+}
+#gmCardResultDiv a:hover { background-color: #0056b3; }
+.gm-spinner {
+    border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff;
+    width: 14px; height: 14px; animation: spin 1s linear infinite;
+    display: inline-block; margin-right: 8px; vertical-align: middle;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+.gm-api-key-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.gm-api-key-group input[type="text"] {
+    flex-grow: 1;
+    min-width: 0;
+}
+.gm-api-key-link {
+    font-size: 12px;
+    color: #007bff;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.gm-api-key-link:hover {
+    text-decoration: underline;
+    color: #0056b3;
+}
+
+/* Styles for new features */
+/* The main button is now cloned, so it doesn't need extensive styling here */
+#gmMainGenerateCardBtn {
+    cursor: pointer;
+}
+
+/* Using a selector that is hopefully stable enough for message items */
+.gm-message-item-for-checkbox {
+    position: relative !important;
+    padding-left: 40px !important; /* Increased padding to make space for shifted checkbox */
+}
+
+.gm-message-checkbox-container {
+    position: absolute;
+    top: 10px;
+    left: -25px; /* Moved further to the left */
+    width: 25px;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+.gm-message-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #4CAF50; /* Style the checkbox color */
+}
+
+/* Site-specific adjustments */
+.gm-on-deepseek .gm-message-item-for-checkbox {
+    position: relative !important;
+    padding-left: 40px !important;
+}
+.gm-on-deepseek .gm-message-checkbox-container {
+    left: -25px;
+}
+
+.gm-on-doubao .gm-message-item-for-checkbox {
+    position: relative !important;
+    padding-left: 30px !important;
+}
+.gm-on-doubao .gm-message-checkbox-container {
+    left: 5px;
+    top: 15px;
+}

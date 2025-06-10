@@ -1,0 +1,206 @@
+{
+  "extensionName": {
+    "message": "Chat Export Enhancer",
+    "description": "Name of the extension."
+  },
+  "extensionDescription": {
+    "message": "Export DeepSeek/Doubao chats to Word, PDF, Mind Map, MD & create knowledge cards. Includes controls for single/multiple messages.",
+    "description": "Description of the extension."
+  },
+  "generateCardButtonText": {
+    "message": "Generate Card",
+    "description": "Text for the 'Generate Card' button."
+  },
+  "generateCardButtonTitle": {
+    "message": "Generate Image Card (API)",
+    "description": "Tooltip for the 'Generate Card' button."
+  },
+  "cardContentLabel": {
+    "message": "Card Content (Markdown):",
+    "description": "Label for the markdown content textarea."
+  },
+  "apiKeyPlaceholder": {
+    "message": "Please enter your API Key",
+    "description": "Placeholder for API Key input."
+  },
+  "getApiKeyLink": {
+    "message": "Get API Key",
+    "description": "Text for the 'Get API Key' link."
+  },
+  "imageTemplateLabel": {
+    "message": "Image Template:",
+    "description": "Label for image template selection."
+  },
+  "splitModeLabel": {
+    "message": "Split Mode:",
+    "description": "Label for split mode selection."
+  },
+  "heightOverflowHiddenLabel": {
+    "message": "Hide Overflow Height",
+    "description": "Label for height overflow hidden toggle."
+  },
+  "widthLabel": {
+    "message": "Width (px):",
+    "description": "Label for width input."
+  },
+  "heightLabel": {
+    "message": "Height (px):",
+    "description": "Label for height input."
+  },
+  "aspectRatioLabel": {
+    "message": "Aspect Ratio:",
+    "description": "Label for aspect ratio selection."
+  },
+  "fontSelectionLabel": {
+    "message": "Font Selection:",
+    "description": "Label for font selection."
+  },
+  "enableWatermarkLabel": {
+    "message": "Enable Watermark",
+    "description": "Label for watermark toggle."
+  },
+  "watermarkTextPlaceholder": {
+    "message": "Watermark Text",
+    "description": "Placeholder for watermark text input."
+  },
+  "generationResultLabel": {
+    "message": "Generation Result:",
+    "description": "Label for generation result div."
+  },
+  "cancelButton": {
+    "message": "Cancel",
+    "description": "Text for the 'Cancel' button."
+  },
+  "apiKeyRequiredAlert": {
+    "message": "Please enter your API Key.",
+    "description": "Alert message when API Key is missing."
+  },
+  "noCardContentAlert": {
+    "message": "Could not get card content.",
+    "description": "Alert message when card content is empty."
+  },
+  "invalidDimensionsAlert": {
+    "message": "Width and height must be positive numbers.",
+    "description": "Alert message for invalid width/height."
+  },
+  "generatingText": {
+    "message": "Generating",
+    "description": "Text shown during generation."
+  },
+  "requestingApiText": {
+    "message": "Requesting API...",
+    "description": "Text shown when requesting API."
+  },
+  "generatedCardAlt": {
+    "message": "Generated Card",
+    "description": "Alt text for generated image."
+  },
+  "previewOriginalImageButton": {
+    "message": "Preview Original Image",
+    "description": "Text for the 'Preview Original Image' button."
+  },
+  "downloadCardZipText": {
+    "message": "Download Card (ZIP%s)",
+    "description": "Text for downloading card as ZIP. %s is for page count."
+  },
+  "pagesUnit": {
+    "message": "pages",
+    "description": "Unit for pages in ZIP download."
+  },
+  "zipGeneratedConfirm": {
+    "message": "ZIP file has been generated. Do you want to open the download link in a new tab immediately?",
+    "description": "Confirmation message for ZIP download."
+  },
+  "unknownResponseType": {
+    "message": "Received unknown response type",
+    "description": "Error message for unknown API response type."
+  },
+  "noValidUrlInApiResponse": {
+    "message": "No valid image or file URL found in API response.",
+    "description": "Error message for missing URL in API response."
+  },
+  "apiFailed": {
+    "message": "API request failed",
+    "description": "Generic API request failure message."
+  },
+  "errorText": {
+    "message": "Error",
+    "description": "Generic error text."
+  },
+  "requestError": {
+    "message": "Request error",
+    "description": "Generic request error message."
+  },
+  "cannotConnectToServer": {
+    "message": "Could not connect to server",
+    "description": "Error message for server connection failure."
+  },
+  "contentExtractionFailed": {
+    "message": "# Content extraction failed\\n\\nPlease manually copy the content or check the script's DOM selectors.",
+    "description": "Fallback message when content extraction fails."
+  },
+  "selectConversationsAlert": {
+    "message": "Please select conversations to export first.",
+    "description": "Alert when no conversations are selected for export."
+  },
+  "failedToExtractContent": {
+    "message": "Failed to extract content from selected conversations.",
+    "description": "Alert when content extraction for selected items fails."
+  },
+  "exportWordButton": {
+    "message": "Export Word",
+    "description": "Text for the 'Export Word' button."
+  },
+  "exportingText": {
+    "message": "Exporting",
+    "description": "Text shown during export process."
+  },
+  "downloadError": {
+    "message": "Error downloading file",
+    "description": "Error message for file download issues."
+  },
+  "exportFailed": {
+    "message": "Export failed",
+    "description": "Generic export failure message."
+  },
+  "statusCode": {
+    "message": "status code",
+    "description": "Part of an error message indicating HTTP status code."
+  },
+  "unknownError": {
+    "message": "unknown error",
+    "description": "Part of an error message indicating an unknown error."
+  },
+  "cannotParseErrorMessage": {
+    "message": "Unable to parse error message.",
+    "description": "Error message when the received error message cannot be parsed."
+  },
+  "exportPdfButton": {
+    "message": "Export PDF",
+    "description": "Text for the 'Export PDF' button."
+  },
+  "exportMindMapButton": {
+    "message": "Export Mind Map",
+    "description": "Text for the 'Export Mind Map' button."
+  },
+  "exportMarkdownButton": {
+    "message": "Export MD",
+    "description": "Text for the 'Export Markdown' button."
+  },
+  "doubaoAppName": {
+    "message": "Doubao",
+    "description": "Name of the Doubao application for file naming."
+  },
+  "failedToExtractOrEmptyContent": {
+    "message": "Failed to extract content from selected conversations or content is empty.",
+    "description": "Alert when selected content for card generation is empty or extraction fails."
+  },
+  "selectAllButton": {
+    "message": "Select All",
+    "description": "Text for the 'Select All' button."
+  },
+  "deselectAllButton": {
+    "message": "Deselect All",
+    "description": "Text for the 'Deselect All' button."
+  }
+}

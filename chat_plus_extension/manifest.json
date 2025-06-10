@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extensionName__",
+  "version": "1.7",
+  "description": "__MSG_extensionDescription__",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://chat.deepseek.com/*", "*://*.doubao.com/*"],
+      "js": ["content.js"],
+      "css": ["style.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://api.any2card.com/"
+  ],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "clipboardRead",
+    "clipboardWrite",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["/web_accessible_resources/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "default_locale": "en"
+}

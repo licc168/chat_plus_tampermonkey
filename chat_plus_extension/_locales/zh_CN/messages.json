@@ -1,0 +1,206 @@
+{
+  "extensionName": {
+    "message": "对话导出增强",
+    "description": "扩展的名称。"
+  },
+  "extensionDescription": {
+    "message": "增强 DeepSeek & 豆包 Chat，轻松将对话导出为 Word 文档、PDF、思维导图、Markdown，或生成精美的知识卡片。为每条消息添加独立操作按钮，并通过侧边栏全局控件，批量处理勾选的多条消息。",
+    "description": "扩展的描述。"
+  },
+  "generateCardButtonText": {
+    "message": "生成卡片",
+    "description": "“生成卡片”按钮的文本。"
+  },
+  "generateCardButtonTitle": {
+    "message": "生成图文卡片 (API)",
+    "description": "“生成卡片”按钮的提示信息。"
+  },
+  "cardContentLabel": {
+    "message": "卡片内容 (Markdown):",
+    "description": "Markdown 内容文本区域的标签。"
+  },
+  "apiKeyPlaceholder": {
+    "message": "请输入您的 API Key",
+    "description": "API Key 输入框的占位符。"
+  },
+  "getApiKeyLink": {
+    "message": "获取 API Key",
+    "description": "“获取 API Key”链接的文本。"
+  },
+  "imageTemplateLabel": {
+    "message": "图文模板:",
+    "description": "图片模板选择的标签。"
+  },
+  "splitModeLabel": {
+    "message": "分割模式:",
+    "description": "分割模式选择的标签。"
+  },
+  "heightOverflowHiddenLabel": {
+    "message": "超出高度隐藏",
+    "description": "超出高度隐藏开关的标签。"
+  },
+  "widthLabel": {
+    "message": "宽度 (px):",
+    "description": "宽度输入框的标签。"
+  },
+  "heightLabel": {
+    "message": "高度 (px):",
+    "description": "高度输入框的标签。"
+  },
+  "aspectRatioLabel": {
+    "message": "宽高比:",
+    "description": "宽高比选择的标签。"
+  },
+  "fontSelectionLabel": {
+    "message": "字体选择:",
+    "description": "字体选择的标签。"
+  },
+  "enableWatermarkLabel": {
+    "message": "启用水印",
+    "description": "启用水印开关的标签。"
+  },
+  "watermarkTextPlaceholder": {
+    "message": "水印文字",
+    "description": "水印文字输入框的占位符。"
+  },
+  "generationResultLabel": {
+    "message": "生成结果:",
+    "description": "生成结果 div 的标签。"
+  },
+  "cancelButton": {
+    "message": "取消",
+    "description": "“取消”按钮的文本。"
+  },
+  "apiKeyRequiredAlert": {
+    "message": "请输入 API Key。",
+    "description": "API Key 缺失时的提示信息。"
+  },
+  "noCardContentAlert": {
+    "message": "无法获取卡片内容。",
+    "description": "卡片内容为空时的提示信息。"
+  },
+  "invalidDimensionsAlert": {
+    "message": "宽度和高度必须是正数。",
+    "description": "宽度/高度无效时的提示信息。"
+  },
+  "generatingText": {
+    "message": "生成中",
+    "description": "生成过程中显示的文本。"
+  },
+  "requestingApiText": {
+    "message": "正在请求 API...",
+    "description": "请求 API 时显示的文本。"
+  },
+  "generatedCardAlt": {
+    "message": "生成的卡片",
+    "description": "生成图片文件的替代文本。"
+  },
+  "previewOriginalImageButton": {
+    "message": "预览原图",
+    "description": "“预览原图”按钮的文本。"
+  },
+  "downloadCardZipText": {
+    "message": "下载卡片 (ZIP%s)",
+    "description": "下载卡片为 ZIP 文件的文本。%s 用于页数。"
+  },
+  "pagesUnit": {
+    "message": "页",
+    "description": "ZIP 下载中页数的单位。"
+  },
+  "zipGeneratedConfirm": {
+    "message": "ZIP文件已生成，是否立即在新标签页打开下载链接？",
+    "description": "ZIP 文件下载的确认信息。"
+  },
+  "unknownResponseType": {
+    "message": "收到未知类型的响应",
+    "description": "API 响应类型未知时的错误信息。"
+  },
+  "noValidUrlInApiResponse": {
+    "message": "API 响应中未找到有效的图片或文件 URL。",
+    "description": "API 响应中缺少 URL 时的错误信息。"
+  },
+  "apiFailed": {
+    "message": "API 请求失败",
+    "description": "通用的 API 请求失败信息。"
+  },
+  "errorText": {
+    "message": "错误",
+    "description": "通用的错误文本。"
+  },
+  "requestError": {
+    "message": "请求错误",
+    "description": "通用的请求错误信息。"
+  },
+  "cannotConnectToServer": {
+    "message": "无法连接到服务器",
+    "description": "服务器连接失败时的错误信息。"
+  },
+  "contentExtractionFailed": {
+    "message": "# 内容提取失败\\n\\n请手动复制内容或检查脚本的DOM选择器。",
+    "description": "内容提取失败时的回退信息。"
+  },
+  "selectConversationsAlert": {
+    "message": "请先勾选需要导出的对话。",
+    "description": "未选择对话进行导出时的提示。"
+  },
+  "failedToExtractContent": {
+    "message": "未能提取已勾选对话的内容。",
+    "description": "从选定对话中提取内容失败时的提示。"
+  },
+  "exportWordButton": {
+    "message": "导出 Word",
+    "description": "“导出 Word”按钮的文本。"
+  },
+  "exportingText": {
+    "message": "导出中",
+    "description": "导出过程中显示的文本。"
+  },
+  "downloadError": {
+    "message": "下载文件时出错",
+    "description": "文件下载出错时的错误信息。"
+  },
+  "exportFailed": {
+    "message": "导出失败",
+    "description": "通用的导出失败信息。"
+  },
+  "statusCode": {
+    "message": "状态码",
+    "description": "错误信息中表示 HTTP 状态码的部分。"
+  },
+  "unknownError": {
+    "message": "未知错误",
+    "description": "错误信息中表示未知错误的部分。"
+  },
+  "cannotParseErrorMessage": {
+    "message": "无法解析错误信息。",
+    "description": "收到的错误信息无法解析时的错误信息。"
+  },
+  "exportPdfButton": {
+    "message": "导出 PDF",
+    "description": "“导出 PDF”按钮的文本。"
+  },
+  "exportMindMapButton": {
+    "message": "导出思维导图",
+    "description": "“导出思维导图”按钮的文本。"
+  },
+  "exportMarkdownButton": {
+    "message": "导出 MD",
+    "description": "“导出 Markdown”按钮的文本。"
+  },
+  "doubaoAppName": {
+    "message": "豆包",
+    "description": "文件命名时豆包应用的名称。"
+  },
+  "failedToExtractOrEmptyContent": {
+    "message": "未能提取已勾选对话的内容或内容为空。",
+    "description": "生成卡片时，选定内容为空或提取失败的提示。"
+  },
+  "selectAllButton": {
+    "message": "全选",
+    "description": "“全选”按钮的文本。"
+  },
+  "deselectAllButton": {
+    "message": "取消全选",
+    "description": "“取消全选”按钮的文本。"
+  }
+}
