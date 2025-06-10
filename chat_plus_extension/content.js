@@ -39,8 +39,6 @@
     };
 
     // --- Data from constants.ts ---
-    // These arrays can remain as is, or you could move their string values to messages.json if you want to translate template names.
-    // For simplicity, keeping them here as they are configuration data.
     const imageTextTemplates = [
       { id: "memo", name: "备忘录" },
       { id: "popart", name: "波普艺术" },
@@ -440,6 +438,7 @@
                 throw new Error(response.error);
             }
 
+            // Handle both JSON and downloadInitiated types for card generation response
             if (response.status >= 200 && response.status < 300 && response.type === 'json') {
                 const result = JSON.parse(response.responseText);
                 if (result.code === 0) {
@@ -455,7 +454,7 @@
                             previewButton.textContent = chrome.i18n.getMessage("previewOriginalImageButton");
                             previewButton.className = 'gm-preview-image-button';
                             previewButton.onclick = function() {
-                                window.open(result.data.url, '_blank'); // Use window.open for Chrome extension
+                                window.open(result.data.url, '_blank');
                             };
                             cardResultDiv.insertBefore(previewButton, img);
 
@@ -477,8 +476,12 @@
                 } else {
                     throw new Error(result.message || `${chrome.i18n.getMessage("apiFailed")} (API Code: ${result.code})`);
                 }
+            } else if (response.status >= 200 && response.status < 300 && response.type === 'downloadInitiated') {
+                // For direct file downloads initiated by background script (like generating cards as ZIP)
+                cardResultDiv.innerHTML = `<p>${chrome.i18n.getMessage("exportingText")} ${response.filename || 'file'}...</p>`;
+                cardResultDiv.innerHTML += `<p>Please check your browser's download bar.</p>`;
+                // No alert for this case
             } else if (response.type !== 'error') {
-                 // Fallback for unexpected successful responses that are not JSON
                  throw new Error(`${chrome.i18n.getMessage("unexpectedApiResponse")} Status: ${response.status}`);
             }
         } catch (error) {
@@ -896,32 +899,15 @@
             setLoading(false);
             if (response.type === 'error') {
                 alert(`${chrome.i18n.getMessage("exportFailed")}: ${response.error}`);
-                return;
-            }
-
-            if (response.status >= 200 && response.status < 300 && response.type === 'blob') {
+            } else if (response.status >= 200 && response.status < 300 && response.type === 'downloadInitiated') {
+                // Remove the alert for successful download here
+                // alert(`Export successful! Downloading ${response.filename}. Please check your browser's download bar.`);
+            } else if (response.status >= 200 && response.status < 300 && response.type === 'json') {
                 try {
-                    const dispositionHeader = response.responseHeaders;
-                    const filenameMatch = dispositionHeader.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                    const filename = filenameMatch && filenameMatch[1] ? decodeURIComponent(filenameMatch[1].replace(/['"]/g, '')) : 'document.docx';
-
-                    let data = response.response;
-                    if (!(data instanceof ArrayBuffer) && !Array.isArray(data) && typeof data === 'object' && data !== null) {
-                        data = Object.values(data);
-                    }
-                    const blob = new Blob([new Uint8Array(data)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                    const result = JSON.parse(response.responseText);
+                    alert(`${chrome.i18n.getMessage("exportFailed")}: ${result.message || 'Unexpected JSON response.'}`);
                 } catch (e) {
-                    alert(`${chrome.i18n.getMessage("downloadError")}: ` + e.message);
-                    console.error("处理下载时出错:", e);
+                     alert(`${chrome.i18n.getMessage("exportFailed")}: Unexpected response from server.`);
                 }
             } else {
                 alert(`${chrome.i18n.getMessage("exportFailed")}: Unexpected response from server.`);
@@ -977,32 +963,15 @@
             setLoading(false);
             if (response.type === 'error') {
                 alert(`${chrome.i18n.getMessage("exportFailed")}: ${response.error}`);
-                return;
-            }
-
-            if (response.status >= 200 && response.status < 300 && response.type === 'blob') {
+            } else if (response.status >= 200 && response.status < 300 && response.type === 'downloadInitiated') {
+                // Remove the alert for successful download here
+                // alert(`Export successful! Downloading ${response.filename}. Please check your browser's download bar.`);
+            } else if (response.status >= 200 && response.status < 300 && response.type === 'json') {
                 try {
-                    const dispositionHeader = response.responseHeaders;
-                    const filenameMatch = dispositionHeader.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                    const filename = filenameMatch && filenameMatch[1] ? decodeURIComponent(filenameMatch[1].replace(/['"]/g, '')) : 'document.pdf';
-
-                    let data = response.response;
-                    if (!(data instanceof ArrayBuffer) && !Array.isArray(data) && typeof data === 'object' && data !== null) {
-                        data = Object.values(data);
-                    }
-                    const blob = new Blob([new Uint8Array(data)], { type: 'application/pdf' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                    const result = JSON.parse(response.responseText);
+                    alert(`${chrome.i18n.getMessage("exportFailed")}: ${result.message || 'Unexpected JSON response.'}`);
                 } catch (e) {
-                    alert(`${chrome.i18n.getMessage("downloadError")}: ` + e.message);
-                    console.error("处理下载时出错:", e);
+                     alert(`${chrome.i18n.getMessage("exportFailed")}: Unexpected response from server.`);
                 }
             } else {
                 alert(`${chrome.i18n.getMessage("exportFailed")}: Unexpected response from server.`);
@@ -1058,32 +1027,15 @@
             setLoading(false);
             if (response.type === 'error') {
                 alert(`${chrome.i18n.getMessage("exportFailed")}: ${response.error}`);
-                return;
-            }
-
-            if (response.status >= 200 && response.status < 300 && response.type === 'blob') {
+            } else if (response.status >= 200 && response.status < 300 && response.type === 'downloadInitiated') {
+                // Remove the alert for successful download here
+                // alert(`Export successful! Downloading ${response.filename}. Please check your browser's download bar.`);
+            } else if (response.status >= 200 && response.status < 300 && response.type === 'json') {
                 try {
-                    const dispositionHeader = response.responseHeaders;
-                    const filenameMatch = dispositionHeader.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                    const filename = filenameMatch && filenameMatch[1] ? decodeURIComponent(filenameMatch[1].replace(/['"]/g, '')) : 'mindmap.mm';
-
-                    let data = response.response;
-                    if (!(data instanceof ArrayBuffer) && !Array.isArray(data) && typeof data === 'object' && data !== null) {
-                        data = Object.values(data);
-                    }
-                    const blob = new Blob([new Uint8Array(data)], { type: 'application/octet-stream' }); // MIME type for .mm is often octet-stream
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                    const result = JSON.parse(response.responseText);
+                    alert(`${chrome.i18n.getMessage("exportFailed")}: ${result.message || 'Unexpected JSON response.'}`);
                 } catch (e) {
-                    alert(`${chrome.i18n.getMessage("downloadError")}: ` + e.message);
-                    console.error("处理下载时出错:", e);
+                     alert(`${chrome.i18n.getMessage("exportFailed")}: Unexpected response from server.`);
                 }
             } else {
                 alert(`${chrome.i18n.getMessage("exportFailed")}: Unexpected response from server.`);
@@ -1174,28 +1126,28 @@
     }
 
     function addCheckboxesToMessages_DeepSeek() {
-        // 查找所有可能的对话内容区域
-        // 提问部分：在ds-flex节点的上级的上级的前面兄弟节点中查找内容
-        // 回答部分：在ds-flex节点的上级的前面兄弟节点中查找内容
+        // Find all possible conversation content areas
+        // Question part: Look for content in the previous sibling node of the grand-parent of the ds-flex node
+        // Answer part: Look for content in the previous sibling node of the parent of the ds-flex node
         const flexElements = document.querySelectorAll('.ds-flex');
 
         flexElements.forEach(flexEl => {
-            // 跳过已经处理过的对话区域
+            // Skip already processed conversation areas
             const processedParent = flexEl.closest('.gm-message-item-for-checkbox');
             if (processedParent) {
                 return;
             }
 
-            // 检查是否是有效的对话操作区域
+            // Check if it's a valid conversation action area
             const actionButtons = flexEl.querySelectorAll('.ds-icon-button');
             if (actionButtons.length < 2) {
-                return; // 不是我们要找的操作区域
+                return; // Not the action area we are looking for
             }
 
             let messageWrapper = null;
             let contentElement = null;
 
-            // 检查是否是回答部分 - 回答部分的flex直接父级是对话容器
+            // Check if it's the answer part - the direct parent of the flex in the answer part is the conversation container
             const parentElement = flexEl.parentElement;
             if (parentElement) {
                 const markdownElement = parentElement.querySelector('.ds-markdown.ds-markdown--block');
@@ -1205,11 +1157,11 @@
                 }
             }
 
-            // 检查是否是提问部分 - 提问部分需要往上查找两级，然后查找前面的兄弟节点
+            // Check if it's the question part - for the question part, we need to look up two levels, then find the previous sibling
             if (!messageWrapper) {
                 const grandParent = flexEl.parentElement?.parentElement;
                 if (grandParent) {
-                    // 在提问部分，内容通常在祖父节点的前一个兄弟节点中
+                    // In the question part, content is usually in the previous sibling of the grand-parent
                     const prevSibling = grandParent.previousElementSibling;
                     if (prevSibling) {
                         messageWrapper = prevSibling.parentElement;
@@ -1218,14 +1170,14 @@
                 }
             }
 
-            // 如果找到了对话容器和内容元素
+            // If a conversation container and content element are found
             if (messageWrapper && contentElement) {
-                // 确保没有重复添加
+                // Ensure no duplicate additions
                 if (messageWrapper.querySelector('.gm-message-checkbox-container')) {
                     return;
                 }
 
-                // 添加标记类
+                // Add marker class
                 messageWrapper.classList.add('gm-message-item-for-checkbox');
 
                 const container = document.createElement('div');
@@ -1236,7 +1188,7 @@
                 checkbox.className = 'gm-message-checkbox';
 
                 container.appendChild(checkbox);
-                messageWrapper.prepend(container); // 添加到对话容器的开始位置
+                messageWrapper.prepend(container); // Add to the beginning of the conversation container
             }
         });
     }
@@ -1300,17 +1252,14 @@
     }
 
     function runFeatureInjections() {
-        findAndProcessTargetButtons(); // Existing feature
-
-        // These buttons will be added to the floating panel
+        findAndProcessTargetButtons();
         addSelectAllButton();
         addExportWordButton();
         addExportPdfButton();
         addExportMindMapButton();
         addExportMarkdownButton();
         addMainGenerateCardButton();
-
-        addCheckboxesToMessages(); // New feature
+        addCheckboxesToMessages();
     }
 
     // --- Main Execution ---
@@ -1327,7 +1276,7 @@
             if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
                 mutation.addedNodes.forEach(node => {
                     if (node.nodeType === Node.ELEMENT_NODE) {
-                        // 检查新增节点是否包含内容元素或操作按钮
+                        // Check if the added node contains content elements or action buttons
                         if (node.querySelector && (
                             node.querySelector('.ds-flex') ||
                             node.querySelector('.ds-markdown.ds-markdown--block') ||
@@ -1335,19 +1284,19 @@
                         )) {
                             needsCheckboxUpdate = true;
                         }
-                        // 整体更新标志
+                        // Overall update flag
                         needsUpdate = true;
                     }
                 });
             }
         }
 
-        // 如果检测到新的内容元素，立即添加复选框
+        // If new content elements are detected, immediately add checkboxes
         if (needsCheckboxUpdate) {
             addCheckboxesToMessages();
         }
 
-        // 整体功能更新（可能包括其他功能）
+        // Overall feature update (may include other functions)
         if (needsUpdate) {
             // Using a timeout to let the DOM settle and avoid over-firing
             setTimeout(runFeatureInjections, 500);
