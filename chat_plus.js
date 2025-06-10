@@ -1,13 +1,14 @@
 // ==UserScript==
-// @name         DeepSeek Chat to word | image
-// @name:zh-CN   DeepSeek对话导出增强
+// @name         DeepSeek & Doubao Chat to word | image
+// @name:zh-CN   DeepSeek & 豆包 对话导出增强
 // @namespace    http://tampermonkey.net/
-// @version      1.6
-// @description  Enhances DeepSeek Chat to export conversations as Word documents and generate beautiful knowledge cards. Adds buttons for single messages and global controls to process multiple selected messages.
-// @description:zh-CN 增强 DeepSeek Chat，轻松将对话导出为 Word 文档或生成精美的知识卡片。为每条消息添加独立操作按钮，并通过侧边栏全局控件，批量处理勾选的多条消息。
+// @version      1.7
+// @description  Enhances DeepSeek & Doubao Chat to export conversations as Word documents and generate beautiful knowledge cards. Adds buttons for single messages and global controls to process multiple selected messages.
+// @description:zh-CN 增强 DeepSeek & 豆包 Chat，轻松将对话导出为 Word 文档或生成精美的知识卡片。为每条消息添加独立操作按钮，并通过侧边栏全局控件，批量处理勾选的多条消息。
 // @author       licc168
 // @license      MIT
 // @match        *://chat.deepseek.com/*
+// @match        *://*.doubao.com/*
 // @grant        GM_addStyle
 // @grant        GM_openInTab
 // @grant        GM_setValue
@@ -19,6 +20,9 @@
  
 (function() {
     'use strict';
+ 
+    const onDeepSeek = window.location.hostname.includes('deepseek.com');
+    const onDoubao = window.location.hostname.includes('doubao.com');
  
     // --- Configuration ---
     const dislikeIconSvgPathStart = "M18.304";
@@ -289,6 +293,24 @@
             height: 16px;
             cursor: pointer;
             accent-color: #4CAF50; /* Style the checkbox color */
+        }
+ 
+        /* Site-specific adjustments */
+        .gm-on-deepseek .gm-message-item-for-checkbox {
+            position: relative !important;
+            padding-left: 40px !important;
+        }
+        .gm-on-deepseek .gm-message-checkbox-container {
+            left: -25px;
+        }
+ 
+        .gm-on-doubao .gm-message-item-for-checkbox {
+            position: relative !important;
+            padding-left: 30px !important;
+        }
+        .gm-on-doubao .gm-message-checkbox-container {
+            left: 5px;
+            top: 15px;
         }
     `);
  
@@ -723,118 +745,124 @@
             let promptText = '';
  
             // --- Start: New clipboard logic ---
-            const actionsContainer = targetButtonElement.parentElement;
-            let copyButton = null;
- 
-            if (actionsContainer) {
-                const buttonsInContainer = actionsContainer.querySelectorAll('div.ds-icon-button');
-                for (let i = 0; i < buttonsInContainer.length; i++) {
-                    // Check for the specific SVG path of the copy button
-                    // The first path element's 'd' attribute starts with "M3.65169" for the copy button
-                    const svgPath = buttonsInContainer[i].querySelector('svg path[d^="M3.65169"]');
-                    if (svgPath) {
-                        copyButton = buttonsInContainer[i];
-                        break;
+            let copyButton;
+            if (onDeepSeek) {
+                const actionsContainer = targetButtonElement.parentElement;
+                if (actionsContainer) {
+                    const buttonsInContainer = actionsContainer.querySelectorAll('div.ds-icon-button');
+                    for (let i = 0; i < buttonsInContainer.length; i++) {
+                        const svgPath = buttonsInContainer[i].querySelector('svg path[d^="M3.65169"]');
+                        if (svgPath) {
+                            copyButton = buttonsInContainer[i];
+                            break;
+                        }
                     }
+                }
+            } else if (onDoubao) {
+                const actionsContainer = targetButtonElement.closest('.container-tjEzGV');
+                if (actionsContainer) {
+                    copyButton = actionsContainer.querySelector('button[data-testid="message_action_copy"]');
                 }
             }
  
             if (copyButton) {
                 try {
                     copyButton.click(); // Simulate click on the copy button
-                    // Wait a short moment for the clipboard to be populated
                     await new Promise(resolve => setTimeout(resolve, 150)); // 150ms delay
- 
                     promptText = await navigator.clipboard.readText();
  
                     if (promptText && promptText.trim() !== '') {
-                        GM_log('DeepSeek Script: Successfully retrieved content from clipboard.');
+                        GM_log('Script: Successfully retrieved content from clipboard.');
                         showCardModal(promptText);
                         return; // Successfully got content from clipboard
                     } else {
-                        GM_log('DeepSeek Script: Clipboard was empty after copy or contained only whitespace. Falling back to text extraction.');
-                        console.warn('DeepSeek Script: Clipboard was empty after copy or contained only whitespace. Falling back to text extraction.');
-                        promptText = ''; // Ensure promptText is reset if clipboard was empty
+                        GM_log('Script: Clipboard was empty after copy. Falling back to text extraction.');
+                        promptText = ''; // Ensure promptText is reset
                     }
                 } catch (err) {
-                    GM_log('DeepSeek Script: Failed to read from clipboard. Error: ' + err.message + '. Falling back to text extraction.');
-                    console.warn('DeepSeek Script: Failed to read from clipboard. Error:', err, '. Falling back to text extraction.');
-                    promptText = ''; // Ensure promptText is reset on error
+                    GM_log('Script: Failed to read from clipboard. Error: ' + err.message + '. Falling back.');
+                    promptText = ''; // Ensure promptText is reset
                 }
             } else {
-                GM_log('DeepSeek Script: Could not find the copy button. Falling back to text extraction.');
-                console.warn('DeepSeek Script: Could not find the copy button. Falling back to text extraction.');
+                GM_log('Script: Could not find the copy button. Falling back to text extraction.');
             }
             // --- End: New clipboard logic ---
  
-            // --- Fallback: Existing text extraction logic (if clipboard failed or copy button not found) ---
-            // This logic uses targetButtonElement (the dislike button) as its reference.
-            // Only proceed if promptText is still empty (meaning clipboard method failed or was skipped)
+            // --- Fallback: Existing text extraction logic ---
             if (!promptText) {
-                let messageWrapper = null;
-                let currentElement = targetButtonElement;
-                const messageWrapperSelectors = [
-                    '.group', '.chat-message-item', '.message-container',
-                    'div[class*="message-bubble"]', 'div[class*="content-container"]',
-                ];
+                if (onDeepSeek) {
+                    let messageWrapper = null;
+                    let currentElement = targetButtonElement;
+                    const messageWrapperSelectors = [
+                        '.group', '.chat-message-item', '.message-container',
+                        'div[class*="message-bubble"]', 'div[class*="content-container"]',
+                    ];
  
-                for (let i = 0; i < 7 && currentElement && currentElement.parentElement; i++) {
-                    currentElement = currentElement.parentElement;
-                    for (const selector of messageWrapperSelectors) {
-                        if (currentElement.matches(selector)) {
+                    for (let i = 0; i < 7 && currentElement && currentElement.parentElement; i++) {
+                        currentElement = currentElement.parentElement;
+                        for (const selector of messageWrapperSelectors) {
+                            if (currentElement.matches(selector)) {
+                                messageWrapper = currentElement;
+                                break;
+                            }
+                        }
+                        if (!messageWrapper &&
+                            currentElement.querySelector('div.ds-markdown.ds-markdown--block:not(:empty)') &&
+                            currentElement.contains(targetButtonElement)) {
                             messageWrapper = currentElement;
-                            break;
                         }
+                        if (messageWrapper) break;
                     }
-                    if (!messageWrapper &&
-                        currentElement.querySelector('div.ds-markdown.ds-markdown--block:not(:empty)') &&
-                        currentElement.contains(targetButtonElement)) {
-                        messageWrapper = currentElement;
-                    }
-                    if (messageWrapper) break;
-                }
  
-                if (messageWrapper) {
-                    const markdownElements = Array.from(messageWrapper.querySelectorAll('div.ds-markdown.ds-markdown--block:not(:empty)'));
-                    let foundMd = null;
-                    for (let i = markdownElements.length - 1; i >= 0; i--) {
-                        if (!markdownElements[i].contains(targetButtonElement)) {
-                            foundMd = markdownElements[i];
-                            break;
-                        }
-                    }
-                    if (foundMd) {
-                        promptText = (foundMd.innerText || foundMd.textContent || "").trim();
-                    }
-                }
- 
-                if (!promptText) {
-                    let searchStartNode = targetButtonElement.parentElement;
-                    for (let i = 0; i < 3 && searchStartNode; i++) {
-                        let sibling = searchStartNode.previousElementSibling;
-                        while (sibling) {
-                            if (sibling.matches('div.ds-markdown.ds-markdown--block:not(:empty)')) {
-                                promptText = (sibling.innerText || sibling.textContent || "").trim();
+                    if (messageWrapper) {
+                        const markdownElements = Array.from(messageWrapper.querySelectorAll('div.ds-markdown.ds-markdown--block:not(:empty)'));
+                        let foundMd = null;
+                        for (let i = markdownElements.length - 1; i >= 0; i--) {
+                            if (!markdownElements[i].contains(targetButtonElement)) {
+                                foundMd = markdownElements[i];
                                 break;
                             }
-                            const mdBlock = sibling.querySelector('div.ds-markdown.ds-markdown--block:not(:empty)');
-                            if (mdBlock) {
-                                promptText = (mdBlock.innerText || mdBlock.textContent || "").trim();
-                                break;
-                            }
-                            sibling = sibling.previousElementSibling;
                         }
-                        if (promptText) break;
-                        searchStartNode = searchStartNode.parentElement;
+                        if (foundMd) {
+                            promptText = (foundMd.innerText || foundMd.textContent || "").trim();
+                        }
+                    }
+ 
+                    if (!promptText) {
+                        let searchStartNode = targetButtonElement.parentElement;
+                        for (let i = 0; i < 3 && searchStartNode; i++) {
+                            let sibling = searchStartNode.previousElementSibling;
+                            while (sibling) {
+                                if (sibling.matches('div.ds-markdown.ds-markdown--block:not(:empty)')) {
+                                    promptText = (sibling.innerText || sibling.textContent || "").trim();
+                                    break;
+                                }
+                                const mdBlock = sibling.querySelector('div.ds-markdown.ds-markdown--block:not(:empty)');
+                                if (mdBlock) {
+                                    promptText = (mdBlock.innerText || mdBlock.textContent || "").trim();
+                                    break;
+                                }
+                                sibling = sibling.previousElementSibling;
+                            }
+                            if (promptText) break;
+                            searchStartNode = searchStartNode.parentElement;
+                        }
+                    }
+                    GM_log('Script: Using fallback text extraction for DeepSeek. Found: ' + (promptText ? 'content' : 'no content'));
+                } else if (onDoubao) {
+                    const messageWrapper = targetButtonElement.closest('div[data-testid="receive_message"]');
+                    if (messageWrapper) {
+                        const contentEl = messageWrapper.querySelector('div[data-testid="message_text_content"]');
+                        if (contentEl) {
+                            promptText = htmlToMarkdown(contentEl);
+                        }
                     }
                 }
-                GM_log('DeepSeek Script: Using fallback text extraction. Found: ' + (promptText ? 'content' : 'no content'));
             }
             // --- End of Fallback logic ---
  
             if (!promptText) {
-                GM_log('DeepSeek Script: Could not reliably find message content using any method. Using a default prompt.');
-                console.warn('DeepSeek Script: Could not reliably find message content using any method. Using a default prompt.');
+                GM_log('Script: Could not reliably find message content using any method.');
                 promptText = "# 内容提取失败\\n\\n请手动复制内容或检查脚本的DOM选择器。";
             }
             showCardModal(promptText);
@@ -848,7 +876,7 @@
         targetButtonElement.dataset.hasGenerateCardButton = 'true';
     }
  
-    function findAndProcessTargetButtons() {
+    function findAndProcessTargetButtons_DeepSeek() {
         const specificDislikeButtonSelector = `div.ds-icon-button svg path[d^="${dislikeIconSvgPathStart}"]`;
         const iconPaths = document.querySelectorAll(specificDislikeButtonSelector);
         iconPaths.forEach(svgPath => {
@@ -861,6 +889,113 @@
                 addGenerateCardButton(buttonElement);
             }
         });
+    }
+ 
+    function findAndProcessTargetButtons_Doubao() {
+        const dislikeButtons = document.querySelectorAll('button[data-testid="message_action_dislike"]');
+        dislikeButtons.forEach(button => {
+            const messageContainer = button.closest('div[data-testid="receive_message"]');
+            if (messageContainer) {
+                addGenerateCardButton(button);
+            }
+        });
+    }
+ 
+    function findAndProcessTargetButtons() {
+        if (onDeepSeek) {
+            findAndProcessTargetButtons_DeepSeek();
+        } else if (onDoubao) {
+            findAndProcessTargetButtons_Doubao();
+        }
+    }
+ 
+    // --- Helper functions for content extraction ---
+    function getCopyButtonFromMessageWrapper(wrapper) {
+        if (onDeepSeek) {
+            const svgPath = wrapper.querySelector('div.ds-icon-button svg path[d^="M3.65169"]');
+            return svgPath ? svgPath.closest('div.ds-icon-button') : null;
+        }
+        if (onDoubao) {
+            return wrapper.querySelector('button[data-testid="message_action_copy"]');
+        }
+        return null;
+    }
+ 
+    function getMarkdownFromMessageWrapper(wrapper) {
+        let contentElement;
+        if (onDeepSeek) {
+            contentElement = wrapper.querySelector('div.ds-markdown.ds-markdown--block:not(:empty)');
+            if (contentElement) return htmlToMarkdown(contentElement);
+ 
+            // Fallback for DeepSeek's complex structure
+            const children = Array.from(wrapper.children || []);
+            for (const child of children) {
+                if (!child.querySelector('.ds-flex') && !child.classList.contains('gm-message-checkbox-container')) {
+                    const text = child.innerText || child.textContent || "";
+                    if (text.trim()) return text.trim();
+                }
+            }
+        } else if (onDoubao) {
+            contentElement = wrapper.querySelector('div[data-testid="message_text_content"]');
+            if (contentElement) return htmlToMarkdown(contentElement);
+        }
+        return '';
+    }
+ 
+    async function getCombinedMarkdownForExport() {
+        const checkedBoxes = document.querySelectorAll('.gm-message-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('请先勾选需要导出的对话。');
+            return null;
+        }
+ 
+        let combinedMarkdown = [];
+        let firstTitle = onDeepSeek ? 'DeepSeek' : '豆包';
+        let foundFirstTitle = false;
+ 
+        for (const checkbox of checkedBoxes) {
+            const messageWrapper = checkbox.closest('.gm-message-item-for-checkbox');
+            if (!messageWrapper) continue;
+ 
+            let promptText = '';
+            const copyButton = getCopyButtonFromMessageWrapper(messageWrapper);
+ 
+            if (copyButton) {
+                try {
+                    copyButton.click();
+                    await new Promise(resolve => setTimeout(resolve, 150));
+                    promptText = await navigator.clipboard.readText();
+                    GM_log(`Script: Successfully retrieved content from clipboard for ${window.location.hostname}.`);
+                } catch (err) {
+                    GM_log(`Script: Clipboard copy failed on ${window.location.hostname}: ${err.message}. Falling back to htmlToMarkdown.`);
+                    promptText = getMarkdownFromMessageWrapper(messageWrapper);
+                }
+            } else {
+                GM_log(`Script: Copy button not found on ${window.location.hostname}, falling back to direct text extraction.`);
+                promptText = getMarkdownFromMessageWrapper(messageWrapper);
+            }
+ 
+            if (promptText) {
+                if (!foundFirstTitle) {
+                    const titleMatch = promptText.match(/^(?:#\s+)(.+)/);
+                    if (titleMatch && titleMatch[1]) {
+                        firstTitle = titleMatch[1].trim();
+                        foundFirstTitle = true;
+                    }
+                }
+                combinedMarkdown.push(promptText);
+            }
+        }
+ 
+        if (combinedMarkdown.length === 0) {
+            alert('未能提取已勾选对话的内容。');
+            return null;
+        }
+ 
+        return {
+            markdown: combinedMarkdown.join('\n\n---\n\n'),
+            title: firstTitle,
+        };
     }
  
     // --- New Feature Functions ---
@@ -943,81 +1078,18 @@
         };
  
         exportWordButton.addEventListener('click', async () => {
-            const checkedBoxes = document.querySelectorAll('.gm-message-checkbox:checked');
-            if (checkedBoxes.length === 0) {
-                alert('请先勾选需要导出的对话。');
-                return;
-            }
- 
             setLoading(true);
- 
-            let combinedMarkdown = [];
-            let firstTitle = 'DeepSeek';
-            let foundFirstTitle = false;
- 
-            for (const checkbox of checkedBoxes) {
-                const messageWrapper = checkbox.closest('.gm-message-item-for-checkbox');
-                if (!messageWrapper) continue;
- 
-                let promptText = '';
-                const copyButton = messageWrapper.querySelector('div.ds-icon-button svg path[d^="M3.65169"]')?.closest('div.ds-icon-button');
- 
-                if (copyButton) {
-                    try {
-                        copyButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 150));
-                        promptText = await navigator.clipboard.readText();
-                        GM_log('DeepSeek Script: Successfully retrieved content from clipboard.');
-                    } catch (err) {
-                        GM_log(`DeepSeek Script: Clipboard copy failed: ${err.message}. Falling back to htmlToMarkdown.`);
-                        const assistantContent = messageWrapper.querySelector('.ds-markdown.ds-markdown--block:not(:empty)');
-                        if (assistantContent) {
-                            promptText = htmlToMarkdown(assistantContent);
-                        }
-                    }
-                } else {
-                    GM_log('DeepSeek Script: Copy button not found, falling back to direct text extraction.');
-                    const assistantContent = messageWrapper.querySelector('.ds-markdown.ds-markdown--block:not(:empty)');
-                    if (assistantContent) {
-                        promptText = htmlToMarkdown(assistantContent);
-                    } else {
-                        const children = Array.from(messageWrapper.children || []);
-                        for (const child of children) {
-                            if (!child.querySelector('.ds-flex') &&
-                                !child.classList.contains('gm-message-checkbox-container')) {
-                                promptText = child.innerText || child.textContent || "";
-                                if (promptText.trim()) break;
-                            }
-                        }
-                    }
-                }
- 
-                if (promptText) {
-                    if (!foundFirstTitle) {
-                        const titleMatch = promptText.match(/^(?:#\s+)(.+)/);
-                        if (titleMatch && titleMatch[1]) {
-                            firstTitle = titleMatch[1].trim();
-                            foundFirstTitle = true;
-                        }
-                    }
-                    combinedMarkdown.push(promptText);
-                }
-            }
- 
- 
-            if (combinedMarkdown.length === 0) {
-                alert('未能提取已勾选对话的内容。');
+            const exportData = await getCombinedMarkdownForExport();
+            if (!exportData) {
                 setLoading(false);
                 return;
             }
- 
-            const fullMarkdown = combinedMarkdown.join('\n\n---\n\n');
  
             GM_xmlhttpRequest({
                 method: "POST",
                 url: API_ENDPOINT_WORD,
                 headers: { "Content-Type": "application/json" },
-                data: JSON.stringify({ markdown: fullMarkdown, title: firstTitle }),
+                data: JSON.stringify({ markdown: exportData.markdown, title: exportData.title }),
                 responseType: 'blob',
                 onload: function(response) {
                     setLoading(false);
@@ -1087,81 +1159,18 @@
         };
  
         exportPdfButton.addEventListener('click', async () => {
-            const checkedBoxes = document.querySelectorAll('.gm-message-checkbox:checked');
-            if (checkedBoxes.length === 0) {
-                alert('请先勾选需要导出的对话。');
-                return;
-            }
- 
             setLoading(true);
- 
-            let combinedMarkdown = [];
-            let firstTitle = 'DeepSeek';
-            let foundFirstTitle = false;
- 
-            for (const checkbox of checkedBoxes) {
-                const messageWrapper = checkbox.closest('.gm-message-item-for-checkbox');
-                if (!messageWrapper) continue;
- 
-                let promptText = '';
-                const copyButton = messageWrapper.querySelector('div.ds-icon-button svg path[d^="M3.65169"]')?.closest('div.ds-icon-button');
- 
-                if (copyButton) {
-                    try {
-                        copyButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 150));
-                        promptText = await navigator.clipboard.readText();
-                        GM_log('DeepSeek Script: Successfully retrieved content from clipboard.');
-                    } catch (err) {
-                        GM_log(`DeepSeek Script: Clipboard copy failed: ${err.message}. Falling back to htmlToMarkdown.`);
-                        const assistantContent = messageWrapper.querySelector('.ds-markdown.ds-markdown--block:not(:empty)');
-                        if (assistantContent) {
-                            promptText = htmlToMarkdown(assistantContent);
-                        }
-                    }
-                } else {
-                    GM_log('DeepSeek Script: Copy button not found, falling back to direct text extraction.');
-                    const assistantContent = messageWrapper.querySelector('.ds-markdown.ds-markdown--block:not(:empty)');
-                    if (assistantContent) {
-                        promptText = htmlToMarkdown(assistantContent);
-                    } else {
-                        const children = Array.from(messageWrapper.children || []);
-                        for (const child of children) {
-                            if (!child.querySelector('.ds-flex') &&
-                                !child.classList.contains('gm-message-checkbox-container')) {
-                                promptText = child.innerText || child.textContent || "";
-                                if (promptText.trim()) break;
-                            }
-                        }
-                    }
-                }
- 
-                if (promptText) {
-                    if (!foundFirstTitle) {
-                        const titleMatch = promptText.match(/^(?:#\s+)(.+)/);
-                        if (titleMatch && titleMatch[1]) {
-                            firstTitle = titleMatch[1].trim();
-                            foundFirstTitle = true;
-                        }
-                    }
-                    combinedMarkdown.push(promptText);
-                }
-            }
- 
- 
-            if (combinedMarkdown.length === 0) {
-                alert('未能提取已勾选对话的内容。');
+            const exportData = await getCombinedMarkdownForExport();
+            if (!exportData) {
                 setLoading(false);
                 return;
             }
- 
-            const fullMarkdown = combinedMarkdown.join('\n\n---\n\n');
  
             GM_xmlhttpRequest({
                 method: "POST",
                 url: API_ENDPOINT_PDF,
                 headers: { "Content-Type": "application/json" },
-                data: JSON.stringify({ markdown: fullMarkdown, title: firstTitle }),
+                data: JSON.stringify({ markdown: exportData.markdown, title: exportData.title }),
                 responseType: 'blob',
                 onload: function(response) {
                     setLoading(false);
@@ -1231,81 +1240,18 @@
         };
  
         exportMindMapButton.addEventListener('click', async () => {
-            const checkedBoxes = document.querySelectorAll('.gm-message-checkbox:checked');
-            if (checkedBoxes.length === 0) {
-                alert('请先勾选需要导出的对话。');
-                return;
-            }
- 
             setLoading(true);
- 
-            let combinedMarkdown = [];
-            let firstTitle = 'DeepSeek';
-            let foundFirstTitle = false;
- 
-            for (const checkbox of checkedBoxes) {
-                const messageWrapper = checkbox.closest('.gm-message-item-for-checkbox');
-                if (!messageWrapper) continue;
- 
-                let promptText = '';
-                const copyButton = messageWrapper.querySelector('div.ds-icon-button svg path[d^="M3.65169"]')?.closest('div.ds-icon-button');
- 
-                if (copyButton) {
-                    try {
-                        copyButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 150));
-                        promptText = await navigator.clipboard.readText();
-                        GM_log('DeepSeek Script: Successfully retrieved content from clipboard.');
-                    } catch (err) {
-                        GM_log(`DeepSeek Script: Clipboard copy failed: ${err.message}. Falling back to htmlToMarkdown.`);
-                        const assistantContent = messageWrapper.querySelector('.ds-markdown.ds-markdown--block:not(:empty)');
-                        if (assistantContent) {
-                            promptText = htmlToMarkdown(assistantContent);
-                        }
-                    }
-                } else {
-                    GM_log('DeepSeek Script: Copy button not found, falling back to direct text extraction.');
-                    const assistantContent = messageWrapper.querySelector('.ds-markdown.ds-markdown--block:not(:empty)');
-                    if (assistantContent) {
-                        promptText = htmlToMarkdown(assistantContent);
-                    } else {
-                        const children = Array.from(messageWrapper.children || []);
-                        for (const child of children) {
-                            if (!child.querySelector('.ds-flex') &&
-                                !child.classList.contains('gm-message-checkbox-container')) {
-                                promptText = child.innerText || child.textContent || "";
-                                if (promptText.trim()) break;
-                            }
-                        }
-                    }
-                }
- 
-                if (promptText) {
-                    if (!foundFirstTitle) {
-                        const titleMatch = promptText.match(/^(?:#\s+)(.+)/);
-                        if (titleMatch && titleMatch[1]) {
-                            firstTitle = titleMatch[1].trim();
-                            foundFirstTitle = true;
-                        }
-                    }
-                    combinedMarkdown.push(promptText);
-                }
-            }
- 
- 
-            if (combinedMarkdown.length === 0) {
-                alert('未能提取已勾选对话的内容。');
+            const exportData = await getCombinedMarkdownForExport();
+            if (!exportData) {
                 setLoading(false);
                 return;
             }
- 
-            const fullMarkdown = combinedMarkdown.join('\n\n---\n\n');
  
             GM_xmlhttpRequest({
                 method: "POST",
                 url: API_ENDPOINT_MINDMAP,
                 headers: { "Content-Type": "application/json" },
-                data: JSON.stringify({ markdown: fullMarkdown, title: firstTitle }),
+                data: JSON.stringify({ markdown: exportData.markdown, title: exportData.title }),
                 responseType: 'blob',
                 onload: function(response) {
                     setLoading(false);
@@ -1375,83 +1321,20 @@
         };
  
         exportMarkdownButton.addEventListener('click', async () => {
-            const checkedBoxes = document.querySelectorAll('.gm-message-checkbox:checked');
-            if (checkedBoxes.length === 0) {
-                alert('请先勾选需要导出的对话。');
-                return;
-            }
- 
             setLoading(true);
- 
-            let combinedMarkdown = [];
-            let firstTitle = 'DeepSeek';
-            let foundFirstTitle = false;
- 
-            for (const checkbox of checkedBoxes) {
-                const messageWrapper = checkbox.closest('.gm-message-item-for-checkbox');
-                if (!messageWrapper) continue;
- 
-                let promptText = '';
-                const copyButton = messageWrapper.querySelector('div.ds-icon-button svg path[d^="M3.65169"]')?.closest('div.ds-icon-button');
- 
-                if (copyButton) {
-                    try {
-                        copyButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 150));
-                        promptText = await navigator.clipboard.readText();
-                        GM_log('DeepSeek Script: Successfully retrieved content from clipboard.');
-                    } catch (err) {
-                        GM_log(`DeepSeek Script: Clipboard copy failed: ${err.message}. Falling back to htmlToMarkdown.`);
-                        const assistantContent = messageWrapper.querySelector('.ds-markdown.ds-markdown--block:not(:empty)');
-                        if (assistantContent) {
-                            promptText = htmlToMarkdown(assistantContent);
-                        }
-                    }
-                } else {
-                    GM_log('DeepSeek Script: Copy button not found, falling back to direct text extraction.');
-                    const assistantContent = messageWrapper.querySelector('.ds-markdown.ds-markdown--block:not(:empty)');
-                    if (assistantContent) {
-                        promptText = htmlToMarkdown(assistantContent);
-                    } else {
-                        const children = Array.from(messageWrapper.children || []);
-                        for (const child of children) {
-                            if (!child.querySelector('.ds-flex') &&
-                                !child.classList.contains('gm-message-checkbox-container')) {
-                                promptText = child.innerText || child.textContent || "";
-                                if (promptText.trim()) break;
-                            }
-                        }
-                    }
-                }
- 
-                if (promptText) {
-                    if (!foundFirstTitle) {
-                        const titleMatch = promptText.match(/^(?:#\s+)(.+)/);
-                        if (titleMatch && titleMatch[1]) {
-                            firstTitle = titleMatch[1].trim();
-                            foundFirstTitle = true;
-                        }
-                    }
-                    combinedMarkdown.push(promptText);
-                }
-            }
- 
- 
-            if (combinedMarkdown.length === 0) {
-                alert('未能提取已勾选对话的内容。');
+            const exportData = await getCombinedMarkdownForExport();
+            if (!exportData) {
                 setLoading(false);
                 return;
             }
  
-            const fullMarkdown = combinedMarkdown.join('\n\n---\n\n');
- 
             try {
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-                let chatName = document.title.split(' - ')[0] || firstTitle;
-                chatName = `DeepSeek - ${chatName}`.replace(/[\/\\?%*:|"<>]/g, '-');
+                let chatName = document.title.split(' - ')[0] || exportData.title;
+                chatName = `${onDeepSeek ? 'DeepSeek' : '豆包'} - ${chatName}`.replace(/[\/\\?%*:|"<>]/g, '-');
                 const fileName = `${chatName}_${timestamp}.md`;
  
-                const blob = new Blob([fullMarkdown], { type: 'text/markdown;charset=utf-8' });
+                const blob = new Blob([exportData.markdown], { type: 'text/markdown;charset=utf-8' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.style.display = 'none';
@@ -1484,67 +1367,18 @@
         mainGenButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
  
         mainGenButton.addEventListener('click', async () => {
-            const checkedBoxes = document.querySelectorAll('.gm-message-checkbox:checked');
-            if (checkedBoxes.length === 0) {
-                alert('请先勾选需要生成卡片内容的对话。');
-                return;
-            }
- 
-            let combinedMarkdown = [];
-            for (const checkbox of checkedBoxes) {
-                const messageWrapper = checkbox.closest('.gm-message-item-for-checkbox');
-                if (!messageWrapper) continue;
- 
-                let promptText = '';
-                const copyButton = messageWrapper.querySelector('div.ds-icon-button svg path[d^="M3.65169"]')?.closest('div.ds-icon-button');
- 
-                if (copyButton) {
-                    try {
-                        copyButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 150));
-                        promptText = await navigator.clipboard.readText();
-                        GM_log('DeepSeek Script: Successfully retrieved content from clipboard.');
-                    } catch (err) {
-                        GM_log(`DeepSeek Script: Clipboard copy failed: ${err.message}. Falling back to htmlToMarkdown.`);
-                        const assistantContent = messageWrapper.querySelector('.ds-markdown.ds-markdown--block:not(:empty)');
-                        if (assistantContent) {
-                            promptText = htmlToMarkdown(assistantContent);
-                        }
-                    }
-                } else {
-                    GM_log('DeepSeek Script: Copy button not found, falling back to direct text extraction.');
-                    const assistantContent = messageWrapper.querySelector('.ds-markdown.ds-markdown--block:not(:empty)');
-                    if (assistantContent) {
-                        promptText = htmlToMarkdown(assistantContent);
-                    } else {
-                        const children = Array.from(messageWrapper.children || []);
-                        for (const child of children) {
-                            if (!child.querySelector('.ds-flex') &&
-                                !child.classList.contains('gm-message-checkbox-container')) {
-                                promptText = child.innerText || child.textContent || "";
-                                if (promptText.trim()) break;
-                            }
-                        }
-                    }
-                }
- 
-                if (promptText) {
-                    combinedMarkdown.push(promptText);
-                }
-            }
- 
- 
-            if (combinedMarkdown.length > 0) {
-                showCardModal(combinedMarkdown.join('\n\n---\n\n'));
+            const exportData = await getCombinedMarkdownForExport();
+            if (exportData && exportData.markdown) {
+                showCardModal(exportData.markdown);
             } else {
-                alert('未能提取已勾选对话的内容。');
+                alert('未能提取已勾选对话的内容或内容为空。');
             }
         });
  
         floatingActionPanel.appendChild(mainGenButton);
     }
  
-    function addCheckboxesToMessages() {
+    function addCheckboxesToMessages_DeepSeek() {
         // 查找所有可能的对话内容区域
         // 提问部分：在ds-flex节点的上级的上级的前面兄弟节点中查找内容
         // 回答部分：在ds-flex节点的上级的前面兄弟节点中查找内容
@@ -1612,6 +1446,32 @@
         });
     }
  
+    function addCheckboxesToMessages_Doubao() {
+        document.querySelectorAll('div[data-testid="union_message"]').forEach(messageWrapper => {
+            if (messageWrapper && !messageWrapper.querySelector('.gm-message-checkbox-container')) {
+                messageWrapper.classList.add('gm-message-item-for-checkbox');
+ 
+                const container = document.createElement('div');
+                container.className = 'gm-message-checkbox-container';
+ 
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'gm-message-checkbox';
+ 
+                container.appendChild(checkbox);
+                messageWrapper.prepend(container);
+            }
+        });
+    }
+ 
+    function addCheckboxesToMessages() {
+        if (onDeepSeek) {
+            addCheckboxesToMessages_DeepSeek();
+        } else if (onDoubao) {
+            addCheckboxesToMessages_Doubao();
+        }
+    }
+ 
     function addSelectAllButton() {
         if (document.getElementById('gmMainSelectAllBtn') || !floatingActionPanel) return;
  
@@ -1661,6 +1521,7 @@
     // --- Main Execution ---
     createCardModal();
     createFloatingActionPanel();
+    document.body.classList.add(onDeepSeek ? 'gm-on-deepseek' : (onDoubao ? 'gm-on-doubao' : ''));
     setTimeout(runFeatureInjections, 3000);
  
     const observer = new MutationObserver((mutationsList) => {
