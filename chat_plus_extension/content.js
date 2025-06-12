@@ -805,7 +805,8 @@
 
         Object.assign(floatingActionPanel.style, {
             position: 'fixed',
-            top: '45%',
+            // Changed 'top: 45%' to 'top: 20px' for a top-right position with some margin
+            top: '50px', // Adjusted to move it higher
             right: '10px',
             zIndex: '9999',
             display: 'flex',
@@ -900,8 +901,7 @@
             if (response.type === 'error') {
                 alert(`${chrome.i18n.getMessage("exportFailed")}: ${response.error}`);
             } else if (response.status >= 200 && response.status < 300 && response.type === 'downloadInitiated') {
-                // Remove the alert for successful download here
-                // alert(`Export successful! Downloading ${response.filename}. Please check your browser's download bar.`);
+                // Removed the alert for successful download here
             } else if (response.status >= 200 && response.status < 300 && response.type === 'json') {
                 try {
                     const result = JSON.parse(response.responseText);
@@ -964,8 +964,7 @@
             if (response.type === 'error') {
                 alert(`${chrome.i18n.getMessage("exportFailed")}: ${response.error}`);
             } else if (response.status >= 200 && response.status < 300 && response.type === 'downloadInitiated') {
-                // Remove the alert for successful download here
-                // alert(`Export successful! Downloading ${response.filename}. Please check your browser's download bar.`);
+                // Removed the alert for successful download here
             } else if (response.status >= 200 && response.status < 300 && response.type === 'json') {
                 try {
                     const result = JSON.parse(response.responseText);
@@ -1028,8 +1027,7 @@
             if (response.type === 'error') {
                 alert(`${chrome.i18n.getMessage("exportFailed")}: ${response.error}`);
             } else if (response.status >= 200 && response.status < 300 && response.type === 'downloadInitiated') {
-                // Remove the alert for successful download here
-                // alert(`Export successful! Downloading ${response.filename}. Please check your browser's download bar.`);
+                // Removed the alert for successful download here
             } else if (response.status >= 200 && response.status < 300 && response.type === 'json') {
                 try {
                     const result = JSON.parse(response.responseText);
