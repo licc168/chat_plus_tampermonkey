@@ -818,7 +818,7 @@
         }
 
         return {
-            markdown: combinedMarkdown.join('\n\n---\n\n'),
+            markdown: combinedMarkdown.join('\n\n'),
             title: firstTitle,
         };
     }
