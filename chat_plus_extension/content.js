@@ -15,11 +15,38 @@
     const API_ENDPOINT_WORD = 'https://api.any2card.com/api/md-to-word';
     const API_ENDPOINT_PDF = 'https://api.any2card.com/api/md-to-pdf';
     const API_ENDPOINT_MINDMAP = 'https://api.any2card.com/api/md-to-mindmap';
+    const API_ENDPOINT_SHARE_GOOGLE = 'http://localhost:8089/api/user/shareGoogle';
     const API_KEY_STORAGE = 'deepseek_generate_card_api_key'; // Still used as the key for storage
 
     let modalOverlay = null;
     let apiKeyInput, markdownTextarea, templateSelect, splitModeSelect, widthInput, heightInput, aspectRatioSelect, fontSelect, watermarkToggle, watermarkTextInput, modalGenerateCardButton, modalCancelButton, cardResultDiv, heightOverflowHiddenToggle, heightOverflowHiddenRow;
     let floatingActionPanel = null;
+
+    const SHARE_SETTINGS = {
+        "backgroundColor": "#ffffff",
+        "fontFamily": "var(--font-noto-serif-sc)",
+        "textAlign": "left",
+        "verticalPadding": 20,
+        "horizontalPadding": 12,
+        "isDarkMode": false,
+        "borderRadius": 38,
+        "cardColor": "#4a4a4a",
+        "opacity": 60,
+        "isContentCenter": false,
+        "selectedRatio": "custom",
+        "splitMode": "long",
+        "templateType": "imageText",
+        "selectedImageTextTemplate": "coilnotebook",
+        "cardScale": 0.8,
+        "watermarkText": "",
+        "watermarkEnabled": false,
+        "cardWidth": 440,
+        "cardHeight": 587,
+        "selectedCustomTheme": "custom-template",
+        "selectedResumeTemplate": "neon",
+        "selectedResumeTheme": "theme-sunrise",
+        "lineHeight": 1.6
+    };
 
     const floatingButtonStyles = {
         padding: '8px 12px',
@@ -1100,27 +1127,77 @@
         floatingActionPanel.appendChild(exportMarkdownButton);
     }
 
-    function addMainGenerateCardButton() {
-        if (document.getElementById('gmMainGenerateCardBtn') || !floatingActionPanel) return;
+    function addGenerateKnowledgeCardButton() {
+        if (document.getElementById('gmGenerateKnowledgeCardBtn') || !floatingActionPanel) return;
 
-        const mainGenButton = document.createElement('button');
-        mainGenButton.id = 'gmMainGenerateCardBtn';
-        Object.assign(mainGenButton.style, floatingButtonStyles);
+        const knowledgeCardButton = document.createElement('button');
+        knowledgeCardButton.id = 'gmGenerateKnowledgeCardBtn';
+        Object.assign(knowledgeCardButton.style, floatingButtonStyles);
 
-        const iconHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 15.6538V18C21 19.1046 20.1046 20 19 20H5C3.89543 20 3 19.1046 3 18V6C3 4.89543 3.89543 4 5 4H14.3462" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M7 14L10.0718 10.9282C10.4522 10.5478 11.0854 10.5478 11.4658 10.9282L14 13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><path d="M12.5 15L14.0718 13.4282C14.4522 13.0478 15.0854 13.0478 15.4658 13.4282L18 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><path d="M18 4L22 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M17 9L21 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
-        const buttonText = chrome.i18n.getMessage("generateCardButtonText");
-        mainGenButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
+        const iconHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 8C19.6569 8 21 6.65685 21 5C21 3.34315 19.6569 2 18 2C16.3431 2 15 3.34315 15 5C15 6.65685 16.3431 8 18 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 15C7.65685 15 9 13.6569 9 12C9 10.3431 7.65685 9 6 9C4.34315 9 3 10.3431 3 12C3 13.6569 4.34315 15 6 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 22C19.6569 22 21 20.6569 21 19C21 17.3431 19.6569 16 18 16C16.3431 16 15 17.3431 15 19C15 20.6569 16.3431 22 18 22Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.59 13.51L15.42 17.49" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.41 6.51001L8.59003 10.49" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const buttonText = "生成精美知识卡片";
+        knowledgeCardButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
 
-        mainGenButton.addEventListener('click', async () => {
-            const exportData = await getCombinedMarkdownForExport();
-            if (exportData && exportData.markdown) {
-                showCardModal(exportData.markdown);
+        const setLoading = (isLoading) => {
+            if (isLoading) {
+                knowledgeCardButton.disabled = true;
+                knowledgeCardButton.innerHTML = `<span class="gm-spinner"></span><span>生成中...</span>`;
             } else {
-                alert(chrome.i18n.getMessage("failedToExtractOrEmptyContent"));
+                knowledgeCardButton.disabled = false;
+                knowledgeCardButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
+            }
+        };
+
+        knowledgeCardButton.addEventListener('click', async () => {
+            setLoading(true);
+            const exportData = await getCombinedMarkdownForExport();
+            if (!exportData || !exportData.markdown) {
+                alert("请先选择要生成卡片的内容。");
+                setLoading(false);
+                return;
+            }
+
+            const payload = {
+                settings: SHARE_SETTINGS,
+                editorContent: exportData.markdown,
+            };
+
+            console.log('Generate Knowledge Card params:', payload);
+
+            const response = await chrome.runtime.sendMessage({
+                action: 'xmlHttpRequest',
+                method: "POST",
+                url: API_ENDPOINT_SHARE_GOOGLE,
+                headers: { "Content-Type": "application/json" },
+                data: JSON.stringify(payload)
+            });
+
+            console.log('Raw Generate Knowledge Card response:', response);
+            setLoading(false);
+
+            try {
+                if (response.type === 'error') {
+                    throw new Error(response.error);
+                }
+
+                if (response.status >= 200 && response.status < 300 && response.type === 'json') {
+                    const result = JSON.parse(response.responseText);
+                    if (result.code === 0 && result.data) {
+                        const shareUrl = `https://any2card.com/zh/create?id=${result.data}`;
+                        window.open(shareUrl, '_blank');
+                    } else {
+                        throw new Error(result.message || `生成失败 (API Code: ${result.code})`);
+                    }
+                } else {
+                    throw new Error(`生成失败，服务器返回状态: ${response.status}`);
+                }
+            } catch (error) {
+                alert(`生成出错: ${error.message}`);
+                console.error('Error processing generation response:', error);
             }
         });
 
-        floatingActionPanel.appendChild(mainGenButton);
+        floatingActionPanel.appendChild(knowledgeCardButton);
     }
 
     function addCheckboxesToMessages_DeepSeek() {
@@ -1256,7 +1333,7 @@
         addExportPdfButton();
         addExportMindMapButton();
         addExportMarkdownButton();
-        addMainGenerateCardButton();
+        addGenerateKnowledgeCardButton();
         addCheckboxesToMessages();
     }
 
