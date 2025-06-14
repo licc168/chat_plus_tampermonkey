@@ -158,8 +158,8 @@ button#gmCardCancelBtn:hover { background-color: #e0e0e0; }
 
 .gm-message-checkbox-container {
     position: absolute;
-    top: 10px;
-    left: -25px; /* Moved further to the left */
+    top: 2px;
+    left: 10px; /* Moved from -25px to be visible */
     width: 25px;
     height: 25px;
     display: flex;
@@ -178,9 +178,6 @@ button#gmCardCancelBtn:hover { background-color: #e0e0e0; }
 .gm-on-deepseek .gm-message-item-for-checkbox {
     position: relative !important;
     padding-left: 40px !important;
-}
-.gm-on-deepseek .gm-message-checkbox-container {
-    left: -25px;
 }
 
 .gm-on-doubao .gm-message-item-for-checkbox {
