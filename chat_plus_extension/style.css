@@ -159,7 +159,7 @@ button#gmCardCancelBtn:hover { background-color: #e0e0e0; }
 .gm-message-checkbox-container {
     position: absolute;
     top: 2px;
-    left: 10px; /* Moved from -25px to be visible */
+    left: 4px; /* Moved from -25px to be visible */
     width: 25px;
     height: 25px;
     display: flex;
@@ -168,8 +168,8 @@ button#gmCardCancelBtn:hover { background-color: #e0e0e0; }
     z-index: 10;
 }
 .gm-message-checkbox {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
     cursor: pointer;
     accent-color: #4CAF50; /* Style the checkbox color */
 }

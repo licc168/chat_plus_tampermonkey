@@ -15,7 +15,7 @@
     const API_ENDPOINT_WORD = 'https://api.any2card.com/api/md-to-word';
     const API_ENDPOINT_PDF = 'https://api.any2card.com/api/md-to-pdf';
     const API_ENDPOINT_MINDMAP = 'https://api.any2card.com/api/md-to-mindmap';
-    const API_ENDPOINT_SHARE_GOOGLE = 'http://localhost:8089/api/user/shareGoogle';
+    const API_ENDPOINT_SHARE_GOOGLE = 'https://api.any2card.com/api/user/shareGoogle';
     const API_KEY_STORAGE = 'deepseek_generate_card_api_key'; // Still used as the key for storage
 
     let modalOverlay = null;
@@ -1134,7 +1134,7 @@
         knowledgeCardButton.id = 'gmGenerateKnowledgeCardBtn';
         Object.assign(knowledgeCardButton.style, floatingButtonStyles);
 
-        const iconHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 8C19.6569 8 21 6.65685 21 5C21 3.34315 19.6569 2 18 2C16.3431 2 15 3.34315 15 5C15 6.65685 16.3431 8 18 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 15C7.65685 15 9 13.6569 9 12C9 10.3431 7.65685 9 6 9C4.34315 9 3 10.3431 3 12C3 13.6569 4.34315 15 6 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 22C19.6569 22 21 20.6569 21 19C21 17.3431 19.6569 16 18 16C16.3431 16 15 17.3431 15 19C15 20.6569 16.3431 22 18 22Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.59 13.51L15.42 17.49" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.41 6.51001L8.59003 10.49" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const iconHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.20455 20.7955C2.81402 20.4049 2.81402 19.7718 3.20455 19.3812L13.6188 8.96699L15.033 10.3812L4.61879 20.7955C4.22826 21.186 3.59508 21.186 3.20455 20.7955Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.9542 8.98927L15.033 4.06799L16.4472 2.65378C16.8377 2.26325 17.4709 2.26325 17.8614 2.65378L21.3685 6.16089C21.759 6.55141 21.759 7.18458 21.3685 7.5751L19.9542 8.98927Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.8284 3.87868L20.2426 5.29289" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.1924 9.6967L14.3137 11.818" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 16L4.5 14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 19.5L8 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
         const buttonText = "生成精美知识卡片";
         knowledgeCardButton.innerHTML = iconHTML + `<span>${buttonText}</span>`;
 
@@ -1151,8 +1151,7 @@
         knowledgeCardButton.addEventListener('click', async () => {
             setLoading(true);
             const exportData = await getCombinedMarkdownForExport();
-            if (!exportData || !exportData.markdown) {
-                alert("请先选择要生成卡片的内容。");
+            if (!exportData) {
                 setLoading(false);
                 return;
             }
